@@ -38,10 +38,11 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, bulk_size=5000):
     return contigs
 
 
-def save_coverages(contigs, coverage_filename):
+def save_coverages(contigs, coverage_filename, samples):
     """
     :param contigs: A dict contig_name -> contig_id.
     :param coverage_filename: The name of the dsv file.
+    :param samples: List of sample names.
     """
     coverage_file = utils.parse_dsv(coverage_filename)
 
@@ -55,11 +56,9 @@ def save_coverages(contigs, coverage_filename):
         except KeyError:
             return
         for i, cov in enumerate(_coverages):
-            db.session.add(Coverage(value=cov, sample=header[i], contig_id=contig_id))
+            db.session.add(Coverage(value=cov, sample=samples[i], contig_id=contig_id))
 
-    header = fields[1:]
     if not has_header:
-        header = ['sample_{}'.format(i) for i, _ in enumerate(fields[1:], 1)]
         contig_name, *_coverages = fields
         add_coverages(contig_name, _coverages)
 
@@ -73,10 +72,12 @@ def save_coverages(contigs, coverage_filename):
 class AssembliesApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
-        self.reqparse.add_argument('name', type=str, default='contigset',
+        self.reqparse.add_argument('name', type=str, default='assembly',
                                    location='form')
         self.reqparse.add_argument('fourmers', type=bool, default=False,
                                    location='form')
+        self.reqparse.add_argument('samples[]', action='append',
+                                   location='form', dest='samples')
         self.reqparse.add_argument('contigs', location='files',
                                    type=werkzeug.datastructures.FileStorage)
         self.reqparse.add_argument('coverage', location='files',
@@ -116,7 +117,7 @@ class AssembliesApi(Resource):
                 coverage_file = tempfile.NamedTemporaryFile(delete=False)
                 args.coverage.save(coverage_file)
                 coverage_file.close()
-                save_coverages(contigs, coverage_file.name)
+                save_coverages(contigs, coverage_file.name, args.samples)
 
         return {
             'id': assembly.id,

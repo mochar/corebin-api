@@ -16,7 +16,7 @@ class BinSetApi(Resource):
         return {
             'id': bin_set.id, 'name': bin_set.name, 'color': bin_set.color,
             'bins': [bin.id for bin in bin_set.bins],
-            'assembly': binset.assembly.id
+            'assembly': bin_set.assembly.id
         }
 
     def put(self, assembly_id, id):
