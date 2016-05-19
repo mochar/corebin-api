@@ -1,10 +1,29 @@
 from flask.ext.restful import Resource, reqparse, inputs
 
 from .utils import user_assembly_or_404
-from app import db
+from app import db, app, utils
 from app.models import Contig, Bin
 
 
+def filter_contigs(attr, value):
+    _value = value
+    value = value.rstrip('e').rstrip('l').rstrip('g')
+    if not utils.is_number(value):
+        return
+    value = float(value)
+    if _value.endswith('l'):
+        filter = attr < value
+    elif _value.endswith('le'):
+        filter = attr <= value
+    elif _value.endswith('g'):
+        filter = attr > value
+    elif _value.endswith('ge'):
+        filter = attr >= value
+    else:
+        filter = attr == value
+    return filter
+    
+    
 class ContigsApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
@@ -14,13 +33,16 @@ class ContigsApi(Resource):
             'id', 'name', 'gc', 'length', '-id', '-name', '-gc', '-length'])
         self.reqparse.add_argument('fields', type=str,
                                    default='id,name,length,gc,assembly_id')
-        self.reqparse.add_argument('length', type=str)
+        self.reqparse.add_argument('length', type=str, action='append', default=[])
+        self.reqparse.add_argument('gc', type=str, action='append', default=[])
         self.reqparse.add_argument('bins', type=str)
         self.reqparse.add_argument('coverages', type=inputs.boolean)
+        self.reqparse.add_argument('contigs', type=inputs.boolean, default=True)
         super(ContigsApi, self).__init__()
 
     def get(self, assembly_id):
         args = self.reqparse.parse_args()
+        app.logger.debug(args)
         contigs = user_assembly_or_404(assembly_id).contigs
         if args.fields:
             fields = args.fields.split(',')
@@ -29,17 +51,13 @@ class ContigsApi(Resource):
             order = db.desc(args.sort[1:]) if args.sort[0] == '-' else db.asc(args.sort)
             contigs = contigs.order_by(order)
         if args.length:
-            length = args.length.rstrip('-').rstrip('+')
-            if not length.isnumeric():
-                return
-            length = int(length)
-            if args.length.endswith('-'):
-                filter = Contig.length < length
-            elif args.length.endswith('+'):
-                filter = Contig.length > length
-            else:
-                filter = Contig.length == length
-            contigs = contigs.filter(filter)
+            for value in args.length:
+                filter = filter_contigs(Contig.length, value)
+                contigs = contigs.filter(filter)
+        if args.gc:
+            for value in args.gc:
+                filter = filter_contigs(Contig.gc, value)
+                contigs = contigs.filter(filter)
         if args.bins:
             bin_ids = args.bins.split(',')
             contigs = contigs.join((Bin, Contig.bins)).filter(Bin.id.in_(bin_ids))
@@ -57,6 +75,9 @@ class ContigsApi(Resource):
                     r[cov.name] = cov.value
             result.append(r)
 
-        return {'contigs': result, 'indices': contig_pagination.pages,
-                'index': args.index, 'count': contigs.count(), 'items': args._items}
-
+        return {
+            'contigs': result if args.contigs else [], 
+            'indices': contig_pagination.pages,
+            'index': args.index, 'count': contigs.count(), 
+            'items': args._items
+        }
