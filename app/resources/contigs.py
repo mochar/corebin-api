@@ -42,7 +42,6 @@ class ContigsApi(Resource):
 
     def get(self, assembly_id):
         args = self.reqparse.parse_args()
-        app.logger.debug(args)
         contigs = user_assembly_or_404(assembly_id).contigs
         if args.fields:
             fields = args.fields.split(',')
@@ -72,7 +71,7 @@ class ContigsApi(Resource):
                     r[field] = getattr(contig, field)
             if args.coverages:
                 for cov in contig.coverages:
-                    r[cov.name] = cov.value
+                    r[cov.sample] = cov.value
             result.append(r)
 
         return {
