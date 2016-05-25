@@ -16,12 +16,12 @@ class Bin(db.Model):
     gc = db.Column(db.Integer)
     n50 = db.Column(db.Integer)
 
-    contigs = db.relationship('Contig', secondary=bincontig,
+    contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
                               backref=db.backref('bins', lazy='dynamic'))
 
     def recalculate_values(self):
         self.gc = utils.gc_content_bin(self)
-        self.N50 = utils.n50(self)
+        self.n50 = utils.n50(self)
 
     @property
     def size(self):
