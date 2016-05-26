@@ -25,7 +25,7 @@ class Bin(db.Model):
 
     @property
     def size(self):
-        return len(self.contigs)
+        return self.contigs.count()
 
 
 class Contig(db.Model):
