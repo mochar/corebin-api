@@ -26,16 +26,16 @@ def find_gcs(contigs):
     return data
 
 
-def create_length_data(assembly, bin_set=None):
+def create_length_data(contigs, bin_set=None):
     if bin_set is None:
-        return find_lengths(assembly.contigs)
+        return find_lengths(contigs)
     data = {bin.name: find_lengths(bin.contigs) for bin in bin_set.bins}
     return data
     
 
-def create_gc_data(assembly, bin_set=None):
+def create_gc_data(contigs, bin_set=None):
     if bin_set is None:
-        return find_gcs(assembly.contigs)
+        return find_gcs(contigs)
     data = {bin.name: find_gcs(bin.contigs) for bin in bin_set.bins}
     return data
 
@@ -54,5 +54,6 @@ class ContigsPlotApi(Resource):
             bin_set = assembly.bin_sets.filter_by(id=args.bs).first()
             if bin_set is None:
                 abort(404)
-        return {'length': create_length_data(assembly, bin_set),
-                'gc': create_gc_data(assembly, bin_set)}
+        contigs = assembly.contigs
+        return {'length': create_length_data(contigs, bin_set),
+                'gc': create_gc_data(contigs, bin_set)}
