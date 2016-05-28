@@ -1,5 +1,9 @@
+from collections import OrderedDict
+from time import time
+
 from flask.ext.restful import Resource, reqparse, inputs
 from flask import abort
+import numpy as np
 
 from .utils import user_assembly_or_404
 from app import db, app, utils
@@ -7,22 +11,18 @@ from app.models import Contig, Bin
 
 
 def find_lengths(contigs):
-    return {
-        '< 1.0': contigs.filter(Contig.length <= 1000).count(),
-        '1.0 - 3.5': contigs.filter(Contig.length > 1000, Contig.length <= 3500).count(),
-        '3.5 - 7.0': contigs.filter(Contig.length > 3500, Contig.length <= 7000).count(),
-        '7.0 - 15.0': contigs.filter(Contig.length > 7000, Contig.length <= 15000).count(),
-        '15.0 - 30.0': contigs.filter(Contig.length > 15000, Contig.length <= 30000).count(),
-        '30.0 - 60.0': contigs.filter(Contig.length > 30000, Contig.length <= 60000).count(),
-        '> 60.0': contigs.filter(Contig.length > 60000).count()
-    }
+    # bins = [0, 1000, 3500, 7000, 15000, 30000, 60000]
+    values = [x[0] for x in contigs.with_entities(Contig.length).all()]
+    hist, bins = np.histogram(values, bins=13)
+    data = {'hist': hist.tolist(), 'bins': bins.tolist()}
+    return data
 
 
 def find_gcs(contigs):
-    data = {}
-    for i in range(10):
-        i = i / 10
-        data[str(i)] = contigs.filter(Contig.gc > i, Contig.gc <= i + 0.1).count()
+    bins = [round(bin, 1) for bin in np.linspace(0, 1, 11).tolist()]
+    values = [x[0] for x in contigs.with_entities(Contig.gc).all()]
+    hist, _ = np.histogram(values, bins=bins)
+    data = {'hist': hist.tolist(), 'bins': bins}
     return data
 
 
@@ -54,6 +54,6 @@ class ContigsPlotApi(Resource):
             bin_set = assembly.bin_sets.filter_by(id=args.bs).first()
             if bin_set is None:
                 abort(404)
-        contigs = assembly.contigs
+        contigs = assembly.contigs        
         return {'length': create_length_data(contigs, bin_set),
                 'gc': create_gc_data(contigs, bin_set)}
