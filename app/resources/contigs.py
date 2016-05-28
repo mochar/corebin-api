@@ -1,4 +1,5 @@
 from flask.ext.restful import Resource, reqparse, inputs
+import numpy as np
 
 from .utils import user_assembly_or_404
 from app import db, app, utils
@@ -63,8 +64,14 @@ class ContigsApi(Resource):
         if args.coverages:
             contigs = contigs.options(db.joinedload('coverages'))
         contig_pagination = contigs.paginate(args.index, args._items, False)
+        
+        if args.bins:
+            data = np.array([[float(x) for x in contig.fourmerfreqs.split(',')] 
+                             for contig in contig_pagination.items])
+            p_components, *_ = utils.pca(data, 3)
+            
         result = []
-        for contig in contig_pagination.items:
+        for i, contig in enumerate(contig_pagination.items):
             r = {}
             if args.fields:
                 for field in fields:
@@ -72,6 +79,8 @@ class ContigsApi(Resource):
             if args.coverages:
                 for cov in contig.coverages:
                     r[cov.sample] = cov.value
+            if args.bins:
+                r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
             result.append(r)
 
         return {
