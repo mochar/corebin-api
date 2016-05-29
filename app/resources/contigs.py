@@ -60,6 +60,7 @@ class ContigsApi(Resource):
                 filter = filter_contigs(Contig.gc, value)
                 contigs = contigs.filter(filter)
         if args.bins:
+            contigs = contigs.options(db.joinedload('bins'))
             bin_ids = args.bins.split(',')
             contigs = contigs.join((Bin, Contig.bins)).filter(Bin.id.in_(bin_ids))
         if args.coverages:
@@ -83,8 +84,8 @@ class ContigsApi(Resource):
             if args.bins:
                 r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
             if args.colors:
-                for bin_set, color in contig.bins.with_entities(Bin.bin_set_id, Bin.color).all():
-                    r['color_{}'.format(bin_set)] = color
+                for bin in contig.bins:
+                    r['color_{}'.format(bin.bin_set_id)] = bin.color
             result.append(r)
 
         return {

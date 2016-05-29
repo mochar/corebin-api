@@ -17,7 +17,7 @@ class Bin(db.Model):
     n50 = db.Column(db.Integer)
 
     contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
-                              backref=db.backref('bins', lazy='dynamic'))
+                              backref=db.backref('bins'))
 
     def recalculate_values(self):
         self.gc = utils.gc_content_bin(self)
