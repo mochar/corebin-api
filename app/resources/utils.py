@@ -20,3 +20,10 @@ def bin_set_or_404(assembly_id, id):
         abort(404)
     return bin_set
     
+    
+def bin_or_404(assembly_id, bin_set_id, id):
+    bin_set = bin_set_or_404(assembly_id, bin_set_id)
+    bin = bin_set.bins.filter_by(id=id).first()
+    if bin is None:
+        abort(404)
+    return bin
