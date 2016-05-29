@@ -38,6 +38,7 @@ class ContigsApi(Resource):
         self.reqparse.add_argument('gc', type=str, action='append', default=[])
         self.reqparse.add_argument('bins', type=str)
         self.reqparse.add_argument('coverages', type=inputs.boolean)
+        self.reqparse.add_argument('colors', type=inputs.boolean)
         self.reqparse.add_argument('contigs', type=inputs.boolean, default=True)
         super(ContigsApi, self).__init__()
 
@@ -81,6 +82,9 @@ class ContigsApi(Resource):
                     r[cov.sample] = cov.value
             if args.bins:
                 r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
+            if args.colors:
+                for bin_set, color in contig.bins.with_entities(Bin.bin_set_id, Bin.color).all():
+                    r['color_{}'.format(bin_set)] = color
             result.append(r)
 
         return {
