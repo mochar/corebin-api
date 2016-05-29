@@ -1,3 +1,5 @@
+from sqlalchemy.orm import load_only
+
 from app import db, utils
 
 
@@ -76,9 +78,9 @@ class Assembly(db.Model):
                                
     @property
     def samples(self):
-        samples = Coverage.query.join(Coverage.contig) \
-            .filter(Contig.assembly == self) \
-            .with_entities(Coverage.sample) \
+        samples = self.contigs.join(Coverage.contig) \
+            .options(Load(Coverage).load_only('sample')) \
+            .with_entities('sample') \
             .distinct() \
             .all()
         return [sample[0] for sample in samples]
