@@ -1,4 +1,4 @@
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import Load
 
 from app import db, utils
 
