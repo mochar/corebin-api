@@ -62,5 +62,5 @@ class BinApi(Resource):
             }
         return result
 
-    def delete(self, contigset_id, bin_set_id, id):
+    def delete(self, assembly_id, bin_set_id, id):
         pass
