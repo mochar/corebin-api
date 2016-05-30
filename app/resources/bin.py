@@ -2,7 +2,7 @@ from flask import abort
 from flask.ext.restful import Resource, reqparse
 
 from .utils import bin_or_404
-from app import db
+from app import db, utils
 from app.models import Bin, Contig
 
 
@@ -48,8 +48,19 @@ class BinApi(Resource):
                 bin.contigs = contigs
             bin.recalculate_values()
         db.session.commit()
-        return {field: getattr(bin, field) for field in
-                'id,name,color,bin_set_id,size,gc,n50'.split(',')}
+        
+        cs = bin.contigs.with_entities(Contig.id, Contig.fourmerfreqs).all()
+        p_components = utils.pca_fourmerfreqs(cs)
+        result = {field: getattr(bin, field) for field in
+                  'id,name,color,bin_set_id,size,gc,n50'.split(',')}
+        result['pcs'] = {}
+        for i, contig in enumerate(cs):
+            result['pcs'][contig.id] = {
+                'pc_1': p_components[i][0],
+                'pc_2': p_components[i][1],
+                'pc_3': p_components[i][2]
+            }
+        return result
 
     def delete(self, contigset_id, bin_set_id, id):
         pass

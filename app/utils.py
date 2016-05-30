@@ -90,3 +90,10 @@ def pca(data, num_components):
     # carry out the transformation on the data using eigenvectors
     # and return the re-scaled data, eigenvalues, and eigenvectors
     return np.dot(evecs.T, data.T).T, evals, evecs
+    
+
+def pca_fourmerfreqs(contigs, num_components=3):
+    data = np.array([[float(x) for x in contig.fourmerfreqs.split(',')] 
+                      for contig in contigs])
+    p_components, *_ = pca(data, num_components)
+    return p_components

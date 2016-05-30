@@ -1,5 +1,4 @@
 from flask.ext.restful import Resource, reqparse, inputs
-import numpy as np
 
 from .utils import user_assembly_or_404
 from app import db, app, utils
@@ -68,9 +67,7 @@ class ContigsApi(Resource):
         contig_pagination = contigs.paginate(args.index, args._items, False)
         
         if args.bins:
-            data = np.array([[float(x) for x in contig.fourmerfreqs.split(',')] 
-                             for contig in contig_pagination.items])
-            p_components, *_ = utils.pca(data, 3)
+            p_components = utils.pca_fourmerfreqs(contig_pagination.items)
             
         result = []
         for i, contig in enumerate(contig_pagination.items):
