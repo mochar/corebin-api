@@ -6,6 +6,19 @@ from app import db, utils
 from app.models import Bin, Contig
 
 
+def calculate_pcs(bin):
+    cs = bin.contigs.with_entities(Contig.id, Contig.fourmerfreqs).all()
+    p_components = utils.pca_fourmerfreqs(cs)
+    pcs = {}
+    for i, contig in enumerate(cs):
+        pcs[contig.id] = {
+            'pc_1': p_components[i][0],
+            'pc_2': p_components[i][1],
+            'pc_3': p_components[i][2]
+        }
+    return pcs
+
+
 class BinApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
@@ -49,17 +62,10 @@ class BinApi(Resource):
             bin.recalculate_values()
         db.session.commit()
         
-        cs = bin.contigs.with_entities(Contig.id, Contig.fourmerfreqs).all()
-        p_components = utils.pca_fourmerfreqs(cs)
         result = {field: getattr(bin, field) for field in
                   'id,name,color,bin_set_id,size,gc,n50'.split(',')}
-        result['pcs'] = {}
-        for i, contig in enumerate(cs):
-            result['pcs'][contig.id] = {
-                'pc_1': p_components[i][0],
-                'pc_2': p_components[i][1],
-                'pc_3': p_components[i][2]
-            }
+        if bin.contigs.count() > 0:
+            result['pcs'] = calculate_pcs(bin)
         return result
 
     def delete(self, assembly_id, bin_set_id, id):
