@@ -6,8 +6,9 @@ from itertools import product
 import werkzeug
 from flask import session, abort
 from flask.ext.restful import Resource, reqparse
+from rq import get_current_job
 
-from app import db, utils, app
+from app import db, utils, app, q
 from app.models import Coverage, Contig, Assembly
 
 
@@ -69,6 +70,18 @@ def save_coverages(contigs, coverage_filename, samples):
     os.remove(coverage_filename)
 
 
+def save_contigs_job(assembly, fasta_filename, calculate_fourmers,
+                     coverage_filename=None, samples=None, bulk_size=5000):
+    job = get_current_job()
+    job.meta['status'] = 'Saving contigs'
+    job.save()
+    contigs = save_contigs(assembly, fasta_filename, calculate_fourmers, bulk_size)
+    if coverage_filename is not None:
+        job.meta['status'] = 'Saving coverage data'
+        job.save()
+        save_coverages(contigs, coverage_filename, samples)
+    
+
 class AssembliesApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
@@ -102,6 +115,7 @@ class AssembliesApi(Resource):
         # Create user ID if first request
         if not 'userid' in session:
             session['userid'] = str(uuid.uuid4())
+            session['jobs'] = []
 
         assembly = Assembly(name=args.name, userid=session['userid'])
         db.session.add(assembly)
@@ -111,18 +125,20 @@ class AssembliesApi(Resource):
             fasta_file = tempfile.NamedTemporaryFile(delete=False)
             args.contigs.save(fasta_file)
             fasta_file.close()
-            contigs = save_contigs(assembly, fasta_file.name, args.fourmers)
 
             if args.coverage:
                 coverage_file = tempfile.NamedTemporaryFile(delete=False)
                 args.coverage.save(coverage_file)
                 coverage_file.close()
-                save_coverages(contigs, coverage_file.name, args.samples)
+                
+            # Send job
+            job_args = [assembly, fasta_file.name, args.fourmers]
+            job_meta = {'name': assembly.name, 'status': 'pending', 
+                        'assembly': assembly.id}
+            if args.coverage:
+                job_args.extend([coverage_file.name, args.samples])
+            job = q.enqueue(save_contigs_job, args=job_args, result_ttl=0,
+                            meta=job_meta, timeout=5*60)
+            session['jobs'].append(job.id)
 
-        return {
-            'id': assembly.id,
-            'name': assembly.name,
-            'size': assembly.contigs.count(),
-            'samples': assembly.samples,
-            'binSets': [bin_set.id for bin_set in assembly.bin_sets]
-        }
+        return {'id': job.id, 'meta': job_meta}

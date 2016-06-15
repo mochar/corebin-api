@@ -17,7 +17,7 @@ class AssemblyApi(Resource):
             'name': assembly.name,
             'size': assembly.contigs.count(),
             'samples': assembly.samples,
-            'bin_sets': [bin_set.id for bin_set in assembly.bin_sets]
+            'binSets': [bin_set.id for bin_set in assembly.bin_sets]
         }
 
     def put(self, id):
