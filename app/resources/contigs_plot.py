@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from time import time
 
-from flask.ext.restful import Resource, reqparse, inputs
+from flask_restful import Resource, reqparse, inputs
 from flask import abort
 import numpy as np
 

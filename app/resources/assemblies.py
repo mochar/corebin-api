@@ -5,7 +5,7 @@ from itertools import product
 
 import werkzeug
 from flask import session, abort
-from flask.ext.restful import Resource, reqparse
+from flask_restful import Resource, reqparse
 from rq import get_current_job
 
 from app import db, utils, app, q

@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, session
-from flask.ext.sqlalchemy import SQLAlchemy
-from flask.ext.restful import Api
+from flask_sqlalchemy import SQLAlchemy
+from flask_restful import Api
 from rq import Queue
 
 from worker import conn

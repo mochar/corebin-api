@@ -1,6 +1,6 @@
 import collections
 
-from flask.ext.restful import Resource, reqparse
+from flask_restful import Resource, reqparse
 
 from .utils import bin_set_or_404
 from app import db
