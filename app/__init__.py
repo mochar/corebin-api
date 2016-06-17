@@ -15,7 +15,7 @@ q = Queue(connection=conn)
 def job(job_id=None):
     if job_id is None:
         jobs = []
-        for job_id in session['jobs']:
+        for job_id in session.get('jobs', []):
             job = q.fetch_job(job_id)
             if job is None or job.is_finished:
                 session['jobs'].remove(job_id)
