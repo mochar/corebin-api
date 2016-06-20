@@ -100,7 +100,7 @@ class AssembliesApi(Resource):
     def get(self):
         userid = session.get('userid')
         if userid is None:
-            abort(404)
+            return {'assemblies': []}
         result = []
         for assembly in Assembly.query.filter_by(userid=userid).all():
             result.append({'name': assembly.name, 'id': assembly.id,
