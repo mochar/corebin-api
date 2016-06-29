@@ -50,7 +50,7 @@ class BinSetsApi(Resource):
         bin_objects = []
         contigs = {c.name: c for c in assembly.contigs}
         for bin_name, bin_contigs in bins.items():
-            bin_contigs = [contigs.pop(c) for c in bin_contigs]
+            bin_contigs = [contigs.pop(c) for c in bin_contigs if c in contigs]
             bin = Bin(name=bin_name, color=self.randcol.generate()[0],
                       bin_set_id=bin_set.id, contigs=bin_contigs)
             bin.recalculate_values()
