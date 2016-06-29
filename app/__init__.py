@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, session
+from flask import Flask, jsonify, session, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api
 from rq import Queue
@@ -10,6 +10,14 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 q = Queue(connection=conn)
 
+def create_job_response(job):
+    if job is None:
+        return make_response(jsonify({}), 404)
+    elif job.is_finished:
+        response = make_response(jsonify(job.meta), 201)
+        response.headers['Location'] = '/a/{}'.format(job.result)
+        return response
+
 @app.route('/jobs/')
 @app.route('/jobs/<job_id>')
 def job(job_id=None):
@@ -20,15 +28,12 @@ def job(job_id=None):
             if job is None or job.is_finished:
                 session['jobs'].remove(job_id)
             else:
-                jobs.append({'id': job_id, 'meta': job.meta})
+                jobs.append({'location': '/jobs/{}'.format(job_id), 'meta': job.meta})
         return jsonify({'jobs': jobs})
     job = q.fetch_job(job_id)
-    if job is None:
-        return jsonify({'error': 'not found'})
-    else:
-        if job.is_finished:
-            session['jobs'].remove(job.id)
-        return jsonify({'id': job.id, 'meta': job.meta})
+    if job is None or job.is_finished:
+        return create_job_response(job)
+    return jsonify(job.meta)
 
 from app.resources.assemblies import AssembliesApi
 from app.resources.assembly import AssemblyApi
