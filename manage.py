@@ -1,7 +1,8 @@
 from flask_script import Manager
 from app import app, db
+from app.models import *
 
-from scripts.export_data import export_bin_set, export_assembly
+from scripts import export_data
 
 
 manager = Manager(app)
@@ -13,13 +14,18 @@ def createdb():
     
 
 @manager.option('-t', '--type', dest='type_')
-@manager.option('-n', '--name', dest='name')
+@manager.option('-i', '--id', dest='id_')
 @manager.option('-f', '--file', dest='file', default=None)
-def export(type_, name, file):
+def export(type_, id_, file):
     if type_ in ('assembly', 'a'):
-        export_assembly(name, file if file else '{}.fa'.format(name))
+        export_data.export_assembly(id_, file)
     elif type_ in ('bin-set', 'b'):
-        export_bin_set(name, file if file else '{}.csv'.format(name))
+        export_data.export_bin_set(id_, file)
+        
+
+@manager.command
+def list():
+    export_data.list_tables()
 
 
 if __name__ == '__main__':
