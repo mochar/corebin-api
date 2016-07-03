@@ -27,8 +27,8 @@ class BinApi(Resource):
         self.reqparse.add_argument('action', type=str, location='form',
                                     choices=['add', 'remove'])
         self.reqparse.add_argument('fields', type=str,
-                                    default='id,name,color,bin_set_id,size'
-                                            ',gc,n50')
+            default='id,name,contamination,completeness,'
+                    'color,bin_set_id,size,gc,n50')
         super(BinApi, self).__init__()
 
     def get(self, assembly_id, bin_set_id, id):
@@ -65,8 +65,7 @@ class BinApi(Resource):
             bin.name = args.name
         db.session.commit()
         
-        result = {field: getattr(bin, field) for field in
-                  'id,name,color,bin_set_id,size,gc,n50'.split(',')}
+        result = {field: getattr(bin, field) for field in args.fields.split(',')}
         if bin.contigs.count() > 0 and args.name is None:
             # "args.name is None" because we dont want de pcs when we
             # are just renaming the bin.

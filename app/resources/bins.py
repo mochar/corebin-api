@@ -13,7 +13,8 @@ class BinsApi(Resource):
         self.reqparse.add_argument('name', type=str)
         self.reqparse.add_argument('contigs', type=bool)
         self.reqparse.add_argument('fields', type=str,
-                                   default='id,name,color,bin_set_id,size,gc,n50')
+            default='id,name,contamination,completeness,'
+                    'color,bin_set_id,size,gc,n50')
         super(BinsApi, self).__init__()
 
     def get(self, assembly_id, id):
@@ -45,7 +46,8 @@ class BinsApi(Resource):
         if args.name:
             bin = Bin(name=args.name, bin_set=bin_set, 
                       color=randcol.generate()[0])
+            bin.recalculate_values()
             db.session.add(bin)
             db.session.commit()
-            return {field: getattr(bin, field) for field in
-                'id,name,color,bin_set_id,size,gc,n50'.split(',')}
+            return {field: getattr(bin, field) 
+                    for field in args.fields.split(',')}

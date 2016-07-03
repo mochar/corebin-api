@@ -4,36 +4,13 @@ from flask_restful import Api
 from rq import Queue
 
 from worker import conn
+from app.session import RedisSessionInterface
 
 app = Flask(__name__)
+app.session_interface = RedisSessionInterface()
 app.config.from_object('config')
 db = SQLAlchemy(app)
 q = Queue(connection=conn)
-
-def create_job_response(job):
-    if job is None:
-        return make_response(jsonify({}), 404)
-    elif job.is_finished:
-        response = make_response(jsonify(job.meta), 201)
-        response.headers['Location'] = '/a/{}'.format(job.result)
-        return response
-
-@app.route('/jobs/')
-@app.route('/jobs/<job_id>')
-def job(job_id=None):
-    if job_id is None:
-        jobs = []
-        for job_id in session.get('jobs', []):
-            job = q.fetch_job(job_id)
-            if job is None or job.is_finished:
-                session['jobs'].remove(job_id)
-            else:
-                jobs.append({'location': '/jobs/{}'.format(job_id), 'meta': job.meta})
-        return jsonify({'jobs': jobs})
-    job = q.fetch_job(job_id)
-    if job is None or job.is_finished:
-        return create_job_response(job)
-    return jsonify(job.meta)
 
 from app.resources.assemblies import AssembliesApi
 from app.resources.assembly import AssemblyApi
@@ -44,6 +21,8 @@ from app.resources.bin_set import BinSetApi
 from app.resources.bins import BinsApi
 from app.resources.bin import BinApi
 from app.resources.matrix import MatrixApi
+from app.resources.hmmer import HmmerApi
+from app.resources.jobs import JobsApi, JobApi
 
 api = Api(app)
 api.add_resource(AssembliesApi, '/a')
@@ -55,5 +34,8 @@ api.add_resource(BinSetApi, '/a/<int:assembly_id>/bs/<int:id>')
 api.add_resource(BinsApi, '/a/<int:assembly_id>/bs/<int:id>/b')
 api.add_resource(BinApi, '/a/<int:assembly_id>/bs/<int:bin_set_id>/b/<int:id>')
 api.add_resource(MatrixApi, '/a/<int:assembly_id>/matrix')
+api.add_resource(HmmerApi, '/hmmer')
+api.add_resource(JobsApi, '/jobs')
+api.add_resource(JobApi, '/jobs/<string:job_id>')
 
 from app import models

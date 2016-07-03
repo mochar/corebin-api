@@ -83,7 +83,7 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
         job.meta['status'] = 'Saving coverage data'
         job.save()
         save_coverages(contigs, coverage_filename, samples)
-    return assembly.id
+    return {'assembly': assembly.id}
     
 
 class AssembliesApi(Resource):
@@ -133,7 +133,7 @@ class AssembliesApi(Resource):
                 
             # Send job
             job_args = [args.name, session['userid'], fasta_file.name, args.fourmers]
-            job_meta = {'name': args.name, 'status': 'pending'}
+            job_meta = {'name': args.name, 'status': 'pending', 'type': 'A'}
             if args.coverage:
                 job_args.extend([coverage_file.name, args.samples])
             job = q.enqueue(save_assembly_job, args=job_args, meta=job_meta,

@@ -2,14 +2,17 @@ import csv
 
 import numpy as np
 
+from app.models import Contig
+
 
 def sort_bins(bins, reverse=False):
     return sorted(bins, key=gc_content_bin, reverse=reverse)
 
 
 def gc_content_bin(bin):
+    contigs = bin.contigs.all()
     gc, atcg = .0, .0
-    for contig in bin.contigs:
+    for contig in contigs:
         if contig.sequence is None:
             continue
         gc += contig.sequence.lower().count('g')
@@ -19,6 +22,9 @@ def gc_content_bin(bin):
 
 
 def n50(bin):
+    contigs = bin.contigs.all()
+    if len(contigs) == 0:
+        return 0
     lengths = sorted([int(c.length) for c in bin.contigs])
     half = sum(lengths) / 2.
     total = 0

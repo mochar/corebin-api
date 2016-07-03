@@ -17,6 +17,8 @@ class Bin(db.Model):
     color = db.Column(db.String(7), default='#ffffff')
     gc = db.Column(db.Integer)
     n50 = db.Column(db.Integer)
+    contamination = db.Column(db.Integer)
+    completeness = db.Column(db.Integer)
 
     contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
                               backref=db.backref('bins'))
@@ -24,10 +26,17 @@ class Bin(db.Model):
     def recalculate_values(self):
         self.gc = utils.gc_content_bin(self)
         self.n50 = utils.n50(self)
+        self.contamination = None
+        self.completeness = None
 
     @property
     def size(self):
         return self.contigs.count()
+        
+    def save_fa(self, path):
+        with open(path, 'w') as f:
+            for contig in self.contigs.yield_per(50):
+                f.write('>{}\n{}\n'.format(contig.name, contig.sequence))
 
 
 class Contig(db.Model):
