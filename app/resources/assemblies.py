@@ -120,6 +120,7 @@ class AssembliesApi(Resource):
         if not 'userid' in session:
             session['userid'] = str(uuid.uuid4())
             session['jobs'] = []
+            session.permanent = True
 
         if args.contigs:
             fasta_file = tempfile.NamedTemporaryFile(delete=False)
