@@ -93,3 +93,9 @@ class Assembly(db.Model):
             .distinct() \
             .all()
         return [sample[0] for sample in samples]
+
+    @property
+    def has_fourmerfreqs(self):
+        contig = self.contigs.first()
+        return contig is not None and contig.fourmerfreqs is not None
+ 

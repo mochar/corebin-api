@@ -16,6 +16,7 @@ class AssemblyApi(Resource):
             'id': assembly.id,
             'name': assembly.name,
             'size': assembly.contigs.count(),
+            'hasFourmerfreqs': assembly.has_fourmerfreqs,
             'samples': assembly.samples,
             'binSets': [bin_set.id for bin_set in assembly.bin_sets]
         }

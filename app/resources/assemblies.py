@@ -109,6 +109,7 @@ class AssembliesApi(Resource):
         for assembly in Assembly.query.filter_by(userid=userid).all():
             result.append({'name': assembly.name, 'id': assembly.id,
                            'size': assembly.contigs.count(),
+                           'hasFourmerfreqs': assembly.has_fourmerfreqs,
                            'binSets': [bin_set.id for bin_set in assembly.bin_sets],
                            'samples': assembly.samples})
         return {'assemblies': result}
