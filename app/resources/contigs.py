@@ -39,6 +39,7 @@ class ContigsApi(Resource):
         self.reqparse.add_argument('coverages', type=inputs.boolean)
         self.reqparse.add_argument('colors', type=inputs.boolean)
         self.reqparse.add_argument('contigs', type=inputs.boolean, default=True)
+        self.reqparse.add_argument('pca', type=inputs.boolean, default=False)
         super(ContigsApi, self).__init__()
 
     def get(self, assembly_id):
@@ -66,7 +67,7 @@ class ContigsApi(Resource):
             contigs = contigs.options(db.joinedload('coverages'))
         contig_pagination = contigs.paginate(args.index, args._items, False)
         
-        if args.bins:
+        if args.pca:
             p_components = utils.pca_fourmerfreqs(contig_pagination.items)
             
         result = []
@@ -78,7 +79,7 @@ class ContigsApi(Resource):
             if args.coverages:
                 for cov in contig.coverages:
                     r[cov.sample] = cov.value
-            if args.bins:
+            if args.pca:
                 r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
             if args.colors:
                 for bin in contig.bins:
