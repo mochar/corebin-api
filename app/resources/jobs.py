@@ -33,6 +33,10 @@ class JobApi(Resource):
             response = make_response(jsonify(job.result), 201)
             if job.meta['type'] == 'A':
                 response.headers['Location'] = '/a/{}'.format(job.result['assembly'])
+            elif job.meta['type'] == 'B':
+                location = '/a/{}/bs/{}'.format(job.result['assembly'],
+                                                job.result['binSet']) 
+                response.headers['Location'] = location
             return response
 
     def get(self, job_id):

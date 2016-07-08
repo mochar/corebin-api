@@ -4,6 +4,7 @@ from flask_restful import Api
 from rq import Queue
 
 from worker import conn
+from app import randomcolor
 from app.session import RedisSessionInterface
 
 app = Flask(__name__)
@@ -11,6 +12,7 @@ app.session_interface = RedisSessionInterface()
 app.config.from_object('config')
 db = SQLAlchemy(app)
 q = Queue(connection=conn)
+randcol = randomcolor.RandomColor()
 
 from app.resources.assemblies import AssembliesApi
 from app.resources.assembly import AssemblyApi
