@@ -22,6 +22,7 @@ class Bin(db.Model):
 
     contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
                               backref=db.backref('bins'))
+    contigs_eager = db.relationship('Contig', secondary=bincontig)
 
     def recalculate_values(self):
         self.gc = utils.gc_content_bin(self)
