@@ -18,21 +18,27 @@ def save_bin_set_job(name, assembly_id, filename):
                      assembly=assembly)
     db.session.add(bin_set)
     db.session.flush()
+    
+    # Query the contigs from the db to dict contig-name -> contig object
+    query = assembly.contigs.options(load_only('name'))
+    contigs = {c.name: c for c in query.all()}
 
     # Dict: bin -> contigs
     bins = defaultdict(list)
+    notfound = []
     for contig_name, bin_name in utils.parse_dsv(filename):
-        bins[bin_name].append(contig_name)
+        if contig_name in contigs:
+            bins[bin_name].append(contig_name)
+        else:
+            notfound.append(contig_name)
 
-    filter = Contig.name.in_([c for bin in bins.values() for c in bin])
-    query = assembly.contigs.filter(filter).options(load_only('name'))
-    contigs = {c.name: c for c in query.all()}
     for bin_name, bin_contigs in bins.items():
-        bin_contigs = [contigs.pop(c) for c in bin_contigs if c in contigs]
+        notfound.extend([c for c in bin_contigs if c not in contigs])
+        bin_contigs = [contigs.pop(c) for c in bin_contigs]
         bin = Bin(name=bin_name, color=randcol.generate()[0],
                   bin_set_id=bin_set.id, contigs=bin_contigs)
         bin.recalculate_values()
-
+    
     # Create a bin for the unbinned contigs.
     bin = Bin(name='unbinned', color='#939393', bin_set_id=bin_set.id,
               contigs=list(contigs.values()))
@@ -40,7 +46,8 @@ def save_bin_set_job(name, assembly_id, filename):
 
     os.remove(filename)
     db.session.commit()
-    return {'assembly': assembly.id, 'binSet': bin_set.id}
+    return {'assembly': assembly.id, 'binSet': bin_set.id,
+        'missing': list(contigs.keys()), 'notfound': notfound}
     
 
 class BinSetsApi(Resource):
