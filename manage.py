@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from flask_script import Manager
 from app import app, db
+from app.models import BinSet
 
 from scripts import export_data
 
@@ -15,6 +16,15 @@ manager = Manager(app)
 @manager.command
 def createdb():
     db.create_all()
+
+
+@manager.command
+def contigs_count():
+    print('Assembly', '# Contigs', 'Bin set', '# Contigs', sep='\t')
+    for bin_set in BinSet.query.all():
+        count = sum([bin.contigs.count() for bin in bin_set.bins.all()])
+        assembly_count = bin_set.assembly.contigs.count()
+        print(bin_set.assembly.name, assembly_count, bin_set.name, count, sep='\t')
     
     
 @manager.command
