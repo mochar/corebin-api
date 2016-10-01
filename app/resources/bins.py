@@ -21,7 +21,7 @@ class BinsApi(Resource):
         bin_set = bin_set_or_404(assembly_id, id)
         args =  self.reqparse.parse_args()
         result = []
-        for bin in bin_set.without_unbinned:
+        for bin in bin_set.bins:
             r = {}
             for field in args.fields.split(','):
                 r[field] = getattr(bin, field)

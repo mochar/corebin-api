@@ -1,6 +1,7 @@
 import collections
 
 from flask_restful import Resource, reqparse
+import numpy as np
 
 from .utils import bin_set_or_404
 from app import db
@@ -16,46 +17,36 @@ class MatrixApi(Resource):
                                     default='count')
 
     def _create_matrix(self, bins1, bins2):
-        matrix = []
-        for bin1, contigs1 in bins1:
-            matching = [0] * len(bins1)
-            for bin2, contigs2 in bins2:
-                matching.append(len([c for c in contigs1 if c in contigs2]))
-            matrix.append(matching)
-        for bin2, contigs2 in bins2:
-            matching = []
-            for bin1, contigs1 in bins1:
-                matching.append(len([c for c in contigs2 if c in contigs1]))
-            matching.extend([0] * len(bins2))
-            matrix.append(matching)
-        return matrix
+        size = len(bins1) + len(bins2)
+        matrix = np.zeros((size, size))
+        lbins1 = len(bins1)
+        for i, d in enumerate(bins1):
+            for j, d2 in enumerate(bins2, lbins1):
+                matrix[i][j] = len(d[1].intersection(d2[1]))
+        matrix[lbins1:, :lbins1] = np.swapaxes(matrix[:lbins1, lbins1:], 1, 0)
+        return matrix.tolist()
         
     def _create_matrix_by_bp(self, bins1, bins2):
-        matrix = []
-        for bin1 in bins1:
-            matching = [0] * len(bins1)
-            for bin2 in bins2:
-                matching.append(sum([c.length for c in bin1.contigs_eager if c in bin2.contigs_eager]))
-            matrix.append(matching)
-        for bin2 in bins2:
-            matching = []
-            for bin1 in bins1:
-                matching.append(sum([c.length for c in bin2.contigs_eager if c in bin1.contigs_eager]))
-            matching.extend([0] * len(bins2))
-            matrix.append(matching)
-        return matrix
+        size = len(bins1) + len(bins2)
+        matrix = np.zeros((size, size))
+        lbins1 = len(bins1)
+        for i, bin1 in enumerate(bins1):
+            for j, bin2 in enumerate(bins2, lbins1):
+                matrix[i][j] = sum([c.length for c in set(bin1.contigs_eager).intersection(set(bin2.contigs_eager))])
+        matrix[lbins1:, :lbins1] = np.swapaxes(matrix[:lbins1, lbins1:], 1, 0)
+        return matrix.tolist()
         
     def generate_matrix_by_count(self, bin_set1, bin_set2):
-        bins1 = [bin.id for bin in sorted(bin_set1.without_unbinned.all(), key=lambda x: x.gc)]
-        bins2 = [bin.id for bin in sorted(bin_set2.without_unbinned.all(), key=lambda x: x.gc, reverse=True)]
+        bins1 = [bin.id for bin in sorted(bin_set1.bins.all(), key=lambda x: x.gc)]
+        bins2 = [bin.id for bin in sorted(bin_set2.bins.all(), key=lambda x: x.gc, reverse=True)]
         all_bins = bins1 + bins2
 
         data = db.session.query(bincontig). \
             filter(bincontig.c.bin_id.in_(all_bins)). \
             all()
-        bins = collections.defaultdict(list)
+        bins = collections.defaultdict(set)
         for bin, contig in data:
-            bins[bin].append(contig)
+            bins[bin].add(contig)
 
         bins11 = [(bin, bins[bin]) for bin in bins1]
         bins22 = [(bin, bins[bin]) for bin in bins2]
@@ -64,14 +55,14 @@ class MatrixApi(Resource):
         
     def generate_matrix_by_bp(self, bin_set1, bin_set2):
         # Get contigs for bin set 1 bins
-        q = bin_set1.without_unbinned.options(
+        q = bin_set1.bins.options(
             db.Load(Bin).load_only('id', 'gc'),
             db.Load(Contig).load_only('length')
         )
         bins1 = sorted(q.all(), key=lambda x: x.gc)
         
         # Get contigs for bin set 2 bins
-        q = bin_set2.without_unbinned.options(
+        q = bin_set2.bins.options(
             db.Load(Bin).load_only('id', 'gc'),
             db.Load(Contig).load_only('length')
         )
