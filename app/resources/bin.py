@@ -73,4 +73,9 @@ class BinApi(Resource):
         return result
 
     def delete(self, assembly_id, bin_set_id, id):
-        pass
+        # TODO: move these contigs to unbinned
+        # TODO: don't remove "unbinned" bin?
+        args = self.reqparse.parse_args()
+        bin = bin_or_404(assembly_id, bin_set_id, id)
+        db.session.delete(bin)
+        db.session.commit()

@@ -30,6 +30,6 @@ class AssemblyApi(Resource):
 
     def delete(self, id):
         assembly = user_assembly_or_404(id)
-        db.session.delete(contigset)
+        db.session.delete(assembly)
         db.session.commit()
 

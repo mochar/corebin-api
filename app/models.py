@@ -21,7 +21,7 @@ class Bin(db.Model):
     completeness = db.Column(db.Integer)
 
     contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
-                              backref=db.backref('bins'))
+                              backref=db.backref('bins'), viewonly=True)
     contigs_eager = db.relationship('Contig', secondary=bincontig)
 
     def recalculate_values(self):
