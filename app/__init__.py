@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, session, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api
+from flask_cors import CORS
 from rq import Queue
 
 from worker import conn
@@ -10,6 +11,7 @@ from app.session import RedisSessionInterface
 app = Flask(__name__)
 app.session_interface = RedisSessionInterface()
 app.config.from_object('config')
+CORS(app)
 db = SQLAlchemy(app)
 q = Queue(connection=conn)
 randcol = randomcolor.RandomColor()
