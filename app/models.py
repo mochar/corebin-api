@@ -81,6 +81,7 @@ class Assembly(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50))
     userid = db.Column(db.String(36))
+    submit_date = db.Column(db.DateTime)
     contigs = db.relationship('Contig', backref='assembly', lazy='dynamic',
                               cascade='all, delete')
     bin_sets = db.relationship('BinSet', backref='assembly', lazy='dynamic',
@@ -100,3 +101,13 @@ class Assembly(db.Model):
         contig = self.contigs.first()
         return contig is not None and contig.fourmerfreqs is not None
  
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'size': self.contigs.count(),
+            'hasFourmerfreqs': self.has_fourmerfreqs,
+            'binSets': self.bin_sets.count(),
+            'samples': self.samples,
+            'submitDate': self.submit_date.isoformat(' ')
+        }

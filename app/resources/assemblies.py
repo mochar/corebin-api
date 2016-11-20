@@ -2,6 +2,7 @@ import tempfile
 import os
 import uuid
 from itertools import product
+from datetime import datetime
 
 import werkzeug
 from flask import session, abort
@@ -46,6 +47,7 @@ def save_coverages(contigs, coverage_filename, samples):
     :param samples: List of sample names.
     """
     coverage_file = utils.parse_dsv(coverage_filename)
+    not_found = []
 
     # Determine if the file has a header.
     fields = next(coverage_file)
@@ -55,6 +57,7 @@ def save_coverages(contigs, coverage_filename, samples):
         try:
             contig_id = contigs.pop(contig_name)
         except KeyError:
+            not_found.append(contig_name)
             return
         for i, cov in enumerate(_coverages):
             db.session.add(Coverage(value=cov, sample=samples[i], contig_id=contig_id))
@@ -68,11 +71,12 @@ def save_coverages(contigs, coverage_filename, samples):
 
     db.session.commit()
     os.remove(coverage_filename)
+    return not_found
 
 
 def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
                       coverage_filename=None, samples=None, bulk_size=5000):
-    assembly = Assembly(name=name, userid=userid)
+    assembly = Assembly(name=name, userid=userid, submit_date=datetime.utcnow())
     db.session.add(assembly)
     db.session.flush()
     job = get_current_job()
@@ -82,7 +86,8 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
     if coverage_filename is not None:
         job.meta['status'] = 'Saving coverage data'
         job.save()
-        save_coverages(contigs, coverage_filename, samples)
+        job.meta['notfound'].extend(save_coverages(contigs, coverage_filename, samples))
+        job.save()
     return {'assembly': assembly.id}
     
 
@@ -104,14 +109,11 @@ class AssembliesApi(Resource):
     def get(self):
         userid = session.get('userid')
         if userid is None:
+            # session['userid'] = 'cea2b9f3-bc74-4df5-ac4c-0ce9ac7fe19f'
+            # session['jobs'] = []
+            # session.permanent = True
             return {'assemblies': []}
-        result = []
-        for assembly in Assembly.query.filter_by(userid=userid).all():
-            result.append({'name': assembly.name, 'id': assembly.id,
-                           'size': assembly.contigs.count(),
-                           'hasFourmerfreqs': assembly.has_fourmerfreqs,
-                           'binSets': [bin_set.id for bin_set in assembly.bin_sets],
-                           'samples': assembly.samples})
+        result = [a.to_dict() for a in Assembly.query.filter_by(userid=userid).all()]
         return {'assemblies': result}
 
     def post(self):
@@ -123,23 +125,25 @@ class AssembliesApi(Resource):
             session['jobs'] = []
             session.permanent = True
 
-        if args.contigs:
-            fasta_file = tempfile.NamedTemporaryFile(delete=False)
-            args.contigs.save(fasta_file)
-            fasta_file.close()
+        if args.contigs.filename == '':
+            return {}, 403, {}
 
-            if args.coverage:
-                coverage_file = tempfile.NamedTemporaryFile(delete=False)
-                args.coverage.save(coverage_file)
-                coverage_file.close()
-                
-            # Send job
-            job_args = [args.name, session['userid'], fasta_file.name, args.fourmers]
-            job_meta = {'name': args.name, 'status': 'pending', 'type': 'A'}
-            if args.coverage:
-                job_args.extend([coverage_file.name, args.samples])
-            job = q.enqueue(save_assembly_job, args=job_args, meta=job_meta,
-                            timeout=5*60)
-            session['jobs'].append(job.id)
+        fasta_file = tempfile.NamedTemporaryFile(delete=False)
+        args.contigs.save(fasta_file)
+        fasta_file.close()
+
+        if args.coverage.filename != '':
+            coverage_file = tempfile.NamedTemporaryFile(delete=False)
+            args.coverage.save(coverage_file)
+            coverage_file.close()
+            
+        # Send job
+        job_args = [args.name, session['userid'], fasta_file.name, args.fourmers]
+        job_meta = {'name': args.name, 'status': 'pending', 'type': 'A', 'notfound': []}
+        if args.coverage.filename != '':
+            job_args.extend([coverage_file.name, args.samples])
+        job = q.enqueue(save_assembly_job, args=job_args, meta=job_meta,
+                        timeout=5*60)
+        session['jobs'].append(job.id)
 
         return job_meta, 202, {'Location': '/jobs/{}'.format(job.id)}

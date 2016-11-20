@@ -12,14 +12,7 @@ class AssemblyApi(Resource):
 
     def get(self, id):
         assembly = user_assembly_or_404(id)
-        return {
-            'id': assembly.id,
-            'name': assembly.name,
-            'size': assembly.contigs.count(),
-            'hasFourmerfreqs': assembly.has_fourmerfreqs,
-            'samples': assembly.samples,
-            'binSets': [bin_set.id for bin_set in assembly.bin_sets]
-        }
+        return assembly.to_dict()
 
     def put(self, id):
         args = self.reqparse.parse_args()
