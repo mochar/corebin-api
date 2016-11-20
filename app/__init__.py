@@ -11,7 +11,7 @@ from app.session import RedisSessionInterface
 app = Flask(__name__)
 app.session_interface = RedisSessionInterface()
 app.config.from_object('config')
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, expose_headers=['Location'])
 db = SQLAlchemy(app)
 q = Queue(connection=conn)
 randcol = randomcolor.RandomColor()
