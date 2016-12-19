@@ -1,6 +1,8 @@
+from collections import Counter
+
 from sqlalchemy.orm import Load
 
-from app import db, utils
+from app import db, utils, app
 
 
 bincontig = db.Table('bincontig',
@@ -8,7 +10,19 @@ bincontig = db.Table('bincontig',
                      db.Column('contig_id', db.Integer, db.ForeignKey('contig.id')))
 
 
-class Bin(db.Model):
+gencontig = db.Table('gencontig',
+                     db.Column('gene_id', db.Integer, db.ForeignKey('essential_gene.id')),
+                     db.Column('contig_id', db.Integer, db.ForeignKey('contig.id')))
+
+
+class FastaMixin:
+    def save_fa(self, path):
+        with open(path, 'w') as f:
+            for contig in self.contigs.yield_per(50):
+                f.write('>{}\n{}\n'.format(contig.name, contig.sequence))
+
+
+class Bin(db.Model, FastaMixin):
     __tablename__ = 'bin'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(25))
@@ -20,31 +34,35 @@ class Bin(db.Model):
     contamination = db.Column(db.Integer)
     completeness = db.Column(db.Integer)
 
+    # contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
+    #                           backref=db.backref('bins'), viewonly=True)
     contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
-                              backref=db.backref('bins'), viewonly=True)
+                              backref=db.backref('bins'))
     contigs_eager = db.relationship('Contig', secondary=bincontig)
 
     def recalculate_values(self):
         self.gc = utils.gc_content_bin(self)
         self.n50 = utils.n50(self)
-        self.contamination = None
-        self.completeness = None
+        if self.bin_set.assembly.genes_searched:
+            self.calculate_cont_comp()
+
+    def calculate_cont_comp(self):
+        all_genes = [gene.name for contig in self.contigs for gene in contig.essential_genes]
+        gene_count = Counter(all_genes)
+        contaminated_count = len([gene for gene, count in gene_count.items() if count > 1])
+        total_reference = EssentialGene.query.filter_by(source='essential').count()
+        self.completeness = round(len(gene_count) / total_reference, 4)
+        self.contamination = round(contaminated_count / total_reference, 4)
 
     @property
     def size(self):
         return self.contigs.count()
-        
-    def save_fa(self, path):
-        with open(path, 'w') as f:
-            for contig in self.contigs.yield_per(50):
-                f.write('>{}\n{}\n'.format(contig.name, contig.sequence))
 
 
 class Contig(db.Model):
     __tablename__ = 'contig'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120))
-    sequence = db.Column(db.String)
     length = db.Column(db.Integer)
     gc = db.Column(db.Integer)
     fourmerfreqs = db.Column(db.String)
@@ -52,6 +70,8 @@ class Contig(db.Model):
                             nullable=False)
     coverages = db.relationship('Coverage', backref='contig',
                                 cascade='all, delete')
+    essential_genes = db.relationship('EssentialGene', secondary=gencontig, 
+                                      lazy='dynamic', backref=db.backref('contigs'))
 
 
 class Coverage(db.Model):
@@ -76,12 +96,14 @@ class BinSet(db.Model):
         return self.bins.filter(Bin.name != 'unbinned')
 
 
-class Assembly(db.Model):
+class Assembly(db.Model, FastaMixin):
     __tablename__ = 'assembly'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50))
     userid = db.Column(db.String(36))
     submit_date = db.Column(db.DateTime)
+    has_fourmerfreqs = db.Column(db.Boolean)
+    genes_searched = db.Column(db.Boolean)
     contigs = db.relationship('Contig', backref='assembly', lazy='dynamic',
                               cascade='all, delete')
     bin_sets = db.relationship('BinSet', backref='assembly', lazy='dynamic',
@@ -95,19 +117,22 @@ class Assembly(db.Model):
             .distinct() \
             .all()
         return [sample[0] for sample in samples]
-
-    @property
-    def has_fourmerfreqs(self):
-        contig = self.contigs.first()
-        return contig is not None and contig.fourmerfreqs is not None
- 
+        
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
             'size': self.contigs.count(),
             'hasFourmerfreqs': self.has_fourmerfreqs,
+            'genesSearched': self.genes_searched,
             'binSets': self.bin_sets.count(),
             'samples': self.samples,
             'submitDate': self.submit_date.isoformat(' ')
         }
+
+
+class EssentialGene(db.Model):
+    __tablename__ = 'essential_gene'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    source = db.Column(db.String(50), nullable=False)

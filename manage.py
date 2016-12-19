@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from flask_script import Manager
 from app import app, db
-from app.models import BinSet
+from app.models import BinSet, EssentialGene
 
 from scripts import export_data
 
@@ -16,6 +16,11 @@ manager = Manager(app)
 @manager.command
 def createdb():
     db.create_all()
+    for line in open('data/essential.hmm', 'r'):
+        if line.startswith('NAME'):
+            gene = line.rstrip().split(' ')[-1]
+            db.session.add(EssentialGene(name=gene, source='essential'))
+    db.session.commit()
 
 
 @manager.command

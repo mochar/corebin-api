@@ -3,6 +3,7 @@ import os
 import uuid
 from itertools import product
 from datetime import datetime
+from subprocess import call
 
 import werkzeug
 from flask import session, abort
@@ -10,21 +11,30 @@ from flask_restful import Resource, reqparse
 from rq import get_current_job
 
 from app import db, utils, app, q
-from app.models import Coverage, Contig, Assembly
+from app.models import Coverage, Contig, Assembly, EssentialGene
 
 
-def save_contigs(assembly, fasta_filename, calculate_fourmers, bulk_size=5000):
+def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=None, 
+                 bulk_size=5000):
     """
     :param assembly: A Assembly model object in which to save the contigs.
     :param fasta_filename: The file name of the fasta file where the contigs are stored.
     :param bulk_size: How many contigs to store per bulk.
     """
     fourmers = [''.join(fourmer) for fourmer in product('atcg', repeat=4)]
+    if essential_genes is not None:
+        all_genes = EssentialGene.query.filter_by(source='essential').all()
+        all_genes = {gene.name: gene for gene in all_genes}
     for i, data in enumerate(utils.parse_fasta(fasta_filename), 1):
         name, sequence = data
+        name = name.split(' ')[0]
         sequence = sequence.lower()
-        contig = Contig(name=name, sequence=sequence, length=len(sequence),
-                        gc=utils.gc_content(sequence), assembly_id=assembly.id)
+        contig = Contig(name=name, length=len(sequence),
+                        gc=utils.gc_content(sequence), 
+                        assembly_id=assembly.id)
+        if essential_genes is not None:
+            for gene in essential_genes[name]:
+                all_genes[gene].contigs.append(contig)
         if calculate_fourmers:
             fourmer_count = len(sequence) - 4 + 1
             frequencies = ','.join(str(sequence.count(fourmer) / fourmer_count)
@@ -35,7 +45,6 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, bulk_size=5000):
             app.logger.debug('At: ' + str(i))
             db.session.flush()
     db.session.commit()
-    os.remove(fasta_filename)
     contigs = {contig.name: contig.id for contig in assembly.contigs}
     return contigs
 
@@ -74,20 +83,55 @@ def save_coverages(contigs, coverage_filename, samples):
     return not_found
 
 
+def find_essential_genes_per_contig(assembly_path):
+    """
+    :param assembly_path: Fasta file with the assembly contigs.
+    1. Run prodigal to predict genes. 
+    2. Run Hmmer to find out which of these genes are essential.
+    3. Return # essential genes per contig.
+    """
+    with tempfile.TemporaryDirectory() as dirname:
+        # Prodigal
+        proteins_path = os.path.join(dirname, 'proteins.faa')
+        prodigal_path = os.path.join(dirname, 'prodigal.txt') 
+        returncode = call(['prodigal', 
+            '-p', 'meta',          # Metagenomics mode
+            '-q',                  # Sssht
+            '-a', proteins_path,   # Protein-coded predicted genes
+            '-i', assembly_path,   # Assembly file (input)
+            '-o', prodigal_path])  # Output
+        # Hmmer
+        model_path = 'data/essential.hmm'
+        orfs_path = os.path.join(dirname, 'orfs.txt')
+        returncode = call(['hmmsearch', 
+            '--tblout', orfs_path,
+            '--cut_tc', '--notextw',
+            model_path, proteins_path],
+            stdout=open(os.devnull, 'wb'))
+
+        return utils.parse_hmmsearch_table(orfs_path)
+
+
 def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
-                      coverage_filename=None, samples=None, bulk_size=5000):
-    assembly = Assembly(name=name, userid=userid, submit_date=datetime.utcnow())
+                      search_genes, coverage_filename=None, 
+                      samples=None, bulk_size=5000):
+    assembly = Assembly(name=name, userid=userid, submit_date=datetime.utcnow(),
+                        has_fourmerfreqs=calculate_fourmers,
+                        genes_searched=search_genes)
     db.session.add(assembly)
     db.session.flush()
     job = get_current_job()
     job.meta['status'] = 'Saving contigs'
     job.save()
-    contigs = save_contigs(assembly, fasta_filename, calculate_fourmers, bulk_size)
+    essential_genes = find_essential_genes_per_contig(fasta_filename) if search_genes else None
+    contigs = save_contigs(assembly, fasta_filename, calculate_fourmers,
+                           essential_genes, bulk_size)
     if coverage_filename is not None:
         job.meta['status'] = 'Saving coverage data'
         job.save()
         job.meta['notfound'].extend(save_coverages(contigs, coverage_filename, samples))
         job.save()
+    os.remove(fasta_filename)
     return {'assembly': assembly.id}
     
 
@@ -97,6 +141,8 @@ class AssembliesApi(Resource):
         self.reqparse.add_argument('name', type=str, default='assembly',
                                    location='form')
         self.reqparse.add_argument('fourmers', type=bool, default=False,
+                                   location='form')
+        self.reqparse.add_argument('hmmer', type=bool, default=False,
                                    location='form')
         self.reqparse.add_argument('samples[]', action='append',
                                    location='form', dest='samples')
@@ -109,9 +155,6 @@ class AssembliesApi(Resource):
     def get(self):
         userid = session.get('userid')
         if userid is None:
-            # session['userid'] = 'cea2b9f3-bc74-4df5-ac4c-0ce9ac7fe19f'
-            # session['jobs'] = []
-            # session.permanent = True
             return {'assemblies': []}
         result = [a.to_dict() for a in Assembly.query.filter_by(userid=userid).all()]
         return {'assemblies': result}
@@ -128,6 +171,8 @@ class AssembliesApi(Resource):
         if args.contigs.filename == '':
             return {}, 403, {}
 
+        name = args.name or 'Assembly'
+
         fasta_file = tempfile.NamedTemporaryFile(delete=False)
         args.contigs.save(fasta_file)
         fasta_file.close()
@@ -138,8 +183,8 @@ class AssembliesApi(Resource):
             coverage_file.close()
             
         # Send job
-        job_args = [args.name, session['userid'], fasta_file.name, args.fourmers]
-        job_meta = {'name': args.name, 'status': 'pending', 'type': 'A', 'notfound': []}
+        job_args = [name, session['userid'], fasta_file.name, args.fourmers, args.hmmer]
+        job_meta = {'name': name, 'status': 'pending', 'type': 'A', 'notfound': []}
         if args.coverage.filename != '':
             job_args.extend([coverage_file.name, args.samples])
         job = q.enqueue(save_assembly_job, args=job_args, meta=job_meta,

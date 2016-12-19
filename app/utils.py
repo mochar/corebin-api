@@ -1,4 +1,5 @@
 import csv
+from collections import defaultdict
 
 import numpy as np
 
@@ -13,11 +14,8 @@ def gc_content_bin(bin):
     contigs = bin.contigs.all()
     gc, atcg = .0, .0
     for contig in contigs:
-        if contig.sequence is None:
-            continue
-        gc += contig.sequence.lower().count('g')
-        gc += contig.sequence.lower().count('c')
-        atcg += len(contig.sequence)
+        gc += contig.gc * contig.length
+        atcg += contig.length
     return float('{0:.3f}'.format(gc / atcg)) if atcg else 0
 
 
@@ -67,12 +65,25 @@ def parse_dsv(dsv_file, delimiter=None):
         yield line.rstrip().split(delimiter)
 
 
+def parse_hmmsearch_table(path):
+    genes = defaultdict(list)
+    with open(path) as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            contig, _, gene, *_ = [x for x in line.split(' ') if x != '']
+            contig = '_'.join(contig.split('_')[:-1])
+            genes[contig].append(gene)
+    return genes
+
+
 def is_number(string):
     try:
         float(string)
         return True
     except ValueError:
         return False
+
 
 def pca(data, num_components):
     # http://stackoverflow.com/questions/13224362/principal-component-analysis-pca-in-python
