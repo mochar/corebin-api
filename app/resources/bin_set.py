@@ -2,13 +2,17 @@ from flask_restful import Resource, reqparse
 
 
 from .utils import bin_set_or_404
-from app import db
+from app import db, app
+from app.models import Contig
 
 
 class BinSetApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type=str)
+        self.reqparse.add_argument('contigs', action='append', type=int, default=[])
+        self.reqparse.add_argument('to_bin', type=int)
+        self.reqparse.add_argument('action', type=str, choices=['move', 'delete'])
         super(BinSetApi, self).__init__()
 
     def get(self, assembly_id, id):
@@ -22,8 +26,24 @@ class BinSetApi(Resource):
     def put(self, assembly_id, id):
         args = self.reqparse.parse_args()
         bin_set = bin_set_or_404(assembly_id, id)
+        # Renaming bin set
         if args.name is not None:
             bin_set.name = args.name
+        # Refinement: moving and deleting contigs
+        if args.action and len(args.contigs) > 0:
+            if args.action == 'move':
+                to_bin = bin_set.bins.filter_by(id=args.to_bin).first_or_404()
+            else: # Removing is actually moving the contigs to unbinned
+                to_bin = bin_set.bins.filter_by(name='unbinned').first_or_404()
+            contigs = bin_set.assembly.contigs. \
+                filter(Contig.id.in_(args.contigs)). \
+                all()
+            for bin in bin_set.bins.options(db.lazyload('contigs_eager')).all():
+                if bin.id == args.to_bin:
+                    bin.contigs.extend(contigs)
+                else:
+                    bin.contigs = [c for c in bin.contigs if c.id not in args.contigs]
+                bin.recalculate_values()
         db.session.commit()
 
     def delete(self, assembly_id, id):

@@ -57,6 +57,19 @@ class Bin(db.Model, FastaMixin):
     @property
     def size(self):
         return self.contigs.count()
+        
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'binSetId': self.bin_set_id,
+            'color': self.color,
+            'gc': self.gc,
+            'n50': self.n50,
+            'size': self.size,
+            'contamination': self.contamination,
+            'completeness': self.completeness
+        }
 
 
 class Contig(db.Model):

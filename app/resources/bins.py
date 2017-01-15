@@ -12,9 +12,7 @@ class BinsApi(Resource):
         self.reqparse.add_argument('ids', type=str)
         self.reqparse.add_argument('name', type=str)
         self.reqparse.add_argument('contigs', type=bool)
-        self.reqparse.add_argument('fields', type=str,
-            default='id,name,contamination,completeness,'
-                    'color,bin_set_id,size,gc,n50')
+        self.reqparse.add_argument('fields', type=str)
         super(BinsApi, self).__init__()
 
     def get(self, assembly_id, id):
@@ -22,9 +20,7 @@ class BinsApi(Resource):
         args =  self.reqparse.parse_args()
         result = []
         for bin in bin_set.bins:
-            r = {}
-            for field in args.fields.split(','):
-                r[field] = getattr(bin, field)
+            r = bin.to_dict()
             if args.contigs:
                 r['contigs'] = [contig.id for contig in bin.contigs]
             result.append(r)
@@ -49,5 +45,4 @@ class BinsApi(Resource):
             bin.recalculate_values()
             db.session.add(bin)
             db.session.commit()
-            return {field: getattr(bin, field) 
-                    for field in args.fields.split(',')}
+            return bin.to_dict()
