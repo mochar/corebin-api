@@ -188,7 +188,7 @@ class AssembliesApi(Resource):
         if args.coverage.filename != '':
             job_args.extend([coverage_file.name, args.samples])
         job = q.enqueue(save_assembly_job, args=job_args, meta=job_meta,
-                        timeout=5*60)
+                        timeout=60*60*24)
         session['jobs'].append(job.id)
 
         return job_meta, 202, {'Location': '/jobs/{}'.format(job.id)}
