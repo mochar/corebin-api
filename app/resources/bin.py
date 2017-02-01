@@ -22,7 +22,7 @@ def calculate_pcs(bin):
 class BinApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
-        self.reqparse.add_argument('name', type=str, location='form')
+        self.reqparse.add_argument('name', type=str)
         self.reqparse.add_argument('contigs', type=str, location='form')
         self.reqparse.add_argument('action', type=str, location='form',
                                     choices=['add', 'remove'])
@@ -65,8 +65,8 @@ class BinApi(Resource):
             bin.name = args.name
         db.session.commit()
         
-        result = {field: getattr(bin, field) for field in args.fields.split(',')}
-        if bin.contigs.count() > 0 and args.name is None:
+        result = bin.to_dict()
+        if args.name is None and bin.contigs.count() > 0:
             # "args.name is None" because we dont want de pcs when we
             # are just renaming the bin.
             result['pcs'] = calculate_pcs(bin)
