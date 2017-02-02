@@ -73,9 +73,15 @@ class BinApi(Resource):
         return result
 
     def delete(self, assembly_id, bin_set_id, id):
-        # TODO: move these contigs to unbinned
-        # TODO: don't remove "unbinned" bin?
         args = self.reqparse.parse_args()
-        bin = bin_or_404(assembly_id, bin_set_id, id)
+        bin_set, bin = bin_or_404(assembly_id, bin_set_id, id, return_bin_set=True)
+        if bin.name == 'unbinned':
+            return {}, 405
+        unbinned = bin_set.bins.filter_by(name='unbinned').first_or_404()
+        contigs = bin.contigs.all()
+        bin.contigs = []
+        unbinned.contigs.extend(contigs)
+        db.session.flush()
+        unbinned.recalculate_values()
         db.session.delete(bin)
         db.session.commit()

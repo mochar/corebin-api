@@ -15,6 +15,9 @@ def bin_set_or_404(assembly_id, id):
     return assembly.bin_sets.filter_by(id=id).first_or_404()
     
     
-def bin_or_404(assembly_id, bin_set_id, id):
+def bin_or_404(assembly_id, bin_set_id, id, return_bin_set=False):
     bin_set = bin_set_or_404(assembly_id, bin_set_id)
-    return bin_set.bins.filter_by(id=id).first_or_404()
+    bin = bin_set.bins.filter_by(id=id).first_or_404()
+    if return_bin_set:
+        return bin_set, bin
+    return bin
