@@ -44,6 +44,11 @@ class BinSetApi(Resource):
 
     def delete(self, assembly_id, id):
         bin_set = bin_set_or_404(assembly_id, id)
+        # Remove all realtions to contigs so that the contigs will 
+        # not be removed.
+        for bin in bin_set.bins:
+            bin.contigs = []
+        db.session.flush()
         db.session.delete(bin_set)
         db.session.commit()
 
