@@ -62,6 +62,8 @@ class BinApi(Resource):
                 bin.contigs = contigs
             bin.recalculate_values()
         if args.name is not None:
+            if bin.name == 'unbinned':
+                return {}, 405
             bin.name = args.name
         db.session.commit()
         
