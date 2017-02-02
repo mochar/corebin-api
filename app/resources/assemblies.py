@@ -124,16 +124,28 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
     db.session.add(assembly)
     db.session.flush()
     job = get_current_job()
+
+    # Find essential genes
+    essential_genes = None
+    if search_genes:
+        job.meta['status'] = 'Searching for essential genes per contig'
+        job.save()
+        essential_genes = find_essential_genes_per_contig(fasta_filename)
+
+    # Save contigs to database
     job.meta['status'] = 'Saving contigs'
     job.save()
-    essential_genes = find_essential_genes_per_contig(fasta_filename) if search_genes else None
     contigs = save_contigs(assembly, fasta_filename, calculate_fourmers,
                            essential_genes, bulk_size)
+
+    # Calculate and save coverages to database
     if coverage_filename is not None:
         job.meta['status'] = 'Saving coverage data'
         job.save()
         job.meta['notfound'].extend(save_coverages(contigs, coverage_filename))
         job.save()
+
+    # Cleanup
     os.remove(fasta_filename)
     return {'assembly': assembly.id}
     
