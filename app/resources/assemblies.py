@@ -49,11 +49,10 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
     return contigs
 
 
-def save_coverages(contigs, coverage_filename, samples):
+def save_coverages(contigs, coverage_filename):
     """
     :param contigs: A dict contig_name -> contig_id.
     :param coverage_filename: The name of the dsv file.
-    :param samples: List of sample names.
     """
     coverage_file = utils.parse_dsv(coverage_filename)
     not_found = []
@@ -61,6 +60,10 @@ def save_coverages(contigs, coverage_filename, samples):
     # Determine if the file has a header.
     fields = next(coverage_file)
     has_header = not utils.is_number(fields[1])
+    if has_header:
+        samples = fields[1:]
+    else:
+        samples = ['sample_{}'.format(i) for i, _ in enumerate(fields[1:], 1)]
 
     def add_coverages(contig_name, _coverages):
         try:
@@ -114,7 +117,7 @@ def find_essential_genes_per_contig(assembly_path):
 
 def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
                       search_genes, coverage_filename=None, 
-                      samples=None, bulk_size=5000):
+                      bulk_size=5000):
     assembly = Assembly(name=name, userid=userid, submit_date=datetime.utcnow(),
                         has_fourmerfreqs=calculate_fourmers,
                         genes_searched=search_genes)
@@ -129,7 +132,7 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
     if coverage_filename is not None:
         job.meta['status'] = 'Saving coverage data'
         job.save()
-        job.meta['notfound'].extend(save_coverages(contigs, coverage_filename, samples))
+        job.meta['notfound'].extend(save_coverages(contigs, coverage_filename))
         job.save()
     os.remove(fasta_filename)
     return {'assembly': assembly.id}
@@ -144,8 +147,6 @@ class AssembliesApi(Resource):
                                    location='form')
         self.reqparse.add_argument('hmmer', type=bool, default=False,
                                    location='form')
-        self.reqparse.add_argument('samples[]', action='append',
-                                   location='form', dest='samples')
         self.reqparse.add_argument('contigs', location='files',
                                    type=werkzeug.datastructures.FileStorage)
         self.reqparse.add_argument('coverage', location='files',
@@ -186,7 +187,7 @@ class AssembliesApi(Resource):
         job_args = [name, session['userid'], fasta_file.name, args.fourmers, args.hmmer]
         job_meta = {'name': name, 'status': 'pending', 'type': 'A', 'notfound': []}
         if args.coverage.filename != '':
-            job_args.extend([coverage_file.name, args.samples])
+            job_args.append(coverage_file.name)
         job = q.enqueue(save_assembly_job, args=job_args, meta=job_meta,
                         timeout=60*60*24)
         session['jobs'].append(job.id)
