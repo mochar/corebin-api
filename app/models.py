@@ -1,6 +1,7 @@
 from collections import Counter
 
 from sqlalchemy.orm import Load
+from sqlalchemy import func
 
 from app import db, utils, app
 
@@ -57,6 +58,12 @@ class Bin(db.Model, FastaMixin):
     @property
     def size(self):
         return self.contigs.count()
+
+    @property
+    def bp(self):
+        if self.size == 0:
+            return 0
+        return self.contigs.with_entities(func.sum(Contig.length)).scalar()
         
     def to_dict(self):
         return {
@@ -67,6 +74,7 @@ class Bin(db.Model, FastaMixin):
             'gc': self.gc,
             'n50': self.n50,
             'size': self.size,
+            'mbp': self.bp / 1000000,
             'contamination': self.contamination,
             'completeness': self.completeness
         }
