@@ -67,7 +67,8 @@ class ContigsApi(Resource):
             contigs = contigs.options(db.joinedload('coverages'))
         contig_pagination = contigs.paginate(args.index, args._items, False)
         
-        if args.pca:
+        if args.pca and len(contig_pagination.items) > 1:
+            app.logger.debug(contig_pagination.items)
             p_components = utils.pca_fourmerfreqs(contig_pagination.items)
             
         result = []
@@ -79,7 +80,7 @@ class ContigsApi(Resource):
             if args.coverages:
                 for cov in contig.coverages:
                     r[cov.sample] = cov.value
-            if args.pca:
+            if args.pca and len(contig_pagination.items) > 1:
                 r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
             if args.colors:
                 for bin in contig.bins:
