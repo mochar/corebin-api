@@ -30,10 +30,10 @@ class Bin(db.Model, FastaMixin):
     bin_set_id = db.Column(db.Integer, db.ForeignKey('bin_set.id'),
                            nullable=False)
     color = db.Column(db.String(7), default='#ffffff')
-    gc = db.Column(db.Integer)
+    gc = db.Column(db.Float)
     n50 = db.Column(db.Integer)
-    contamination = db.Column(db.Integer)
-    completeness = db.Column(db.Integer)
+    contamination = db.Column(db.Float)
+    completeness = db.Column(db.Float)
 
     # contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
     #                           backref=db.backref('bins'), viewonly=True)
@@ -85,7 +85,7 @@ class Contig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120))
     length = db.Column(db.Integer)
-    gc = db.Column(db.Integer)
+    gc = db.Column(db.Float)
     fourmerfreqs = db.Column(db.String)
     assembly_id = db.Column(db.Integer, db.ForeignKey('assembly.id'),
                             nullable=False)
@@ -100,7 +100,7 @@ class Coverage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     contig_id = db.Column(db.Integer, db.ForeignKey('contig.id'), nullable=False)
     sample = db.Column(db.String(60))
-    value = db.Column(db.Integer)
+    value = db.Column(db.Float)
 
 
 class BinSet(db.Model):
