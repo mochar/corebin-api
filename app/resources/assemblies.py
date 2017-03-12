@@ -169,7 +169,7 @@ class AssembliesApi(Resource):
         userid = session.get('userid')
         if userid is None:
             return {'assemblies': []}
-        result = [a.to_dict() for a in Assembly.query.filter_by(userid=userid).all()]
+        result = [a.to_dict() for a in Assembly.query.filter_by(userid=userid, deleted=False).all()]
         return {'assemblies': result}
 
     def post(self):

@@ -125,6 +125,7 @@ class Assembly(db.Model, FastaMixin):
     submit_date = db.Column(db.DateTime)
     has_fourmerfreqs = db.Column(db.Boolean)
     genes_searched = db.Column(db.Boolean)
+    deleted = db.Column(db.Boolean, default=False)
     contigs = db.relationship('Contig', backref='assembly', lazy='dynamic',
                               cascade='all, delete')
     bin_sets = db.relationship('BinSet', backref='assembly', lazy='dynamic',

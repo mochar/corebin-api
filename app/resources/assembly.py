@@ -8,6 +8,7 @@ class AssemblyApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type=str)
+        self.reqparse.add_argument('deleted', type=bool)
         super(AssemblyApi, self).__init__()
 
     def get(self, id):
@@ -19,6 +20,8 @@ class AssemblyApi(Resource):
         assembly = user_assembly_or_404(id)
         if args.name is not None:
             assembly.name = args.name
+        if args.deleted is not None:
+            assembly.deleted = args.deleted
         db.session.commit()
 
     def delete(self, id):
