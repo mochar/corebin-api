@@ -181,8 +181,13 @@ class AssembliesApi(Resource):
             session['jobs'] = []
             session.permanent = True
 
+        # Only one assembly allowed for now
+        job_types = [q.fetch_job(job_id).meta['type'] for job_id in session['jobs']]
+        if 'A' in job_types:
+            return {'message': 'You already have an assembly job running.'}, 403, {}
+
         if args.contigs.filename == '':
-            return {}, 403, {}
+            return {'message': 'Please provide an assembly file.'}, 403, {}
 
         name = args.name or 'Assembly'
 
