@@ -43,3 +43,4 @@ api.add_resource(JobsApi, '/jobs')
 api.add_resource(JobApi, '/jobs/<string:job_id>')
 
 from app import models
+from app import views
