@@ -43,6 +43,7 @@ class JobApi(Resource):
     def get(self, job_id):
         job = q.fetch_job(job_id)
         if job is None or job.is_finished:
+            session['jobs'].remove(job_id)
             return self._create_job_response(job)
         return job.meta
 
