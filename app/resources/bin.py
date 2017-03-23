@@ -23,6 +23,7 @@ class BinApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type=str)
+        self.reqparse.add_argument('color', type=str)
         self.reqparse.add_argument('contigs', type=str, location='form')
         self.reqparse.add_argument('action', type=str, location='form',
                                     choices=['add', 'remove'])
@@ -61,10 +62,11 @@ class BinApi(Resource):
                     all()
                 bin.contigs = contigs
             bin.recalculate_values()
-        if args.name is not None:
+        if args.name is not None or args.color is not None:
             if bin.name == 'unbinned':
                 return {}, 405
-            bin.name = args.name
+            bin.name = args.name or bin.name
+            bin.color = args.color or bin.color
         db.session.commit()
         
         result = bin.to_dict()

@@ -11,6 +11,7 @@ class BinsApi(Resource):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('ids', type=str)
         self.reqparse.add_argument('name', type=str)
+        self.reqparse.add_argument('color', type=str)
         self.reqparse.add_argument('contigs', type=bool)
         self.reqparse.add_argument('fields', type=str)
         super(BinsApi, self).__init__()
@@ -40,8 +41,8 @@ class BinsApi(Resource):
         bin_set = bin_set_or_404(assembly_id, id)
         randcol = randomcolor.RandomColor()
         if args.name:
-            bin = Bin(name=args.name, bin_set=bin_set, 
-                      color=randcol.generate()[0])
+            color = args.color or randcol.generate()[0]
+            bin = Bin(name=args.name, bin_set=bin_set, color=color)
             bin.recalculate_values()
             db.session.add(bin)
             db.session.commit()
