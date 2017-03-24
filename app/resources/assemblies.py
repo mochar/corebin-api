@@ -1,6 +1,7 @@
 import tempfile
 import os
 import uuid
+import json
 from itertools import product
 from datetime import datetime
 from subprocess import call
@@ -11,16 +12,17 @@ from flask_restful import Resource, reqparse
 from rq import get_current_job
 
 from app import db, utils, app, q
-from app.models import Coverage, Contig, Assembly, EssentialGene
+from app.models import Contig, Assembly, EssentialGene
 
 
 def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=None, 
-                 bulk_size=5000):
+                 bulk_size=5000, coverages=None):
     """
     :param assembly: A Assembly model object in which to save the contigs.
     :param fasta_filename: The file name of the fasta file where the contigs are stored.
     :param bulk_size: How many contigs to store per bulk.
     """
+    notfound = []
     fourmers = [''.join(fourmer) for fourmer in product('atcg', repeat=4)]
     if essential_genes is not None:
         all_genes = EssentialGene.query.filter_by(source='essential').all()
@@ -32,6 +34,12 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
         contig = Contig(name=name, length=len(sequence),
                         gc=utils.gc_content(sequence), 
                         assembly_id=assembly.id)
+        if coverages is not None:
+            try:
+                coverage = coverages.pop(name)
+                contig.coverage = '{}' if coverage is None else json.dumps(coverage)
+            except KeyError:
+                notfound.append(name)
         if essential_genes is not None:
             for gene in essential_genes[name]:
                 all_genes[gene].contigs.append(contig)
@@ -45,17 +53,12 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
             app.logger.debug('At: ' + str(i))
             db.session.flush()
     db.session.commit()
-    contigs = {contig.name: contig.id for contig in assembly.contigs}
-    return contigs
+    return notfound
 
 
-def save_coverages(contigs, coverage_filename):
-    """
-    :param contigs: A dict contig_name -> contig_id.
-    :param coverage_filename: The name of the dsv file.
-    """
-    coverage_file = utils.parse_dsv(coverage_filename)
-    not_found = []
+def read_coverages(filename):
+    coverage_file = utils.parse_dsv(filename)
+    coverages = {}
 
     # Determine if the file has a header.
     fields = next(coverage_file)
@@ -64,28 +67,16 @@ def save_coverages(contigs, coverage_filename):
         samples = fields[1:]
     else:
         samples = ['sample_{}'.format(i) for i, _ in enumerate(fields[1:], 1)]
-
-    def add_coverages(contig_name, _coverages):
-        try:
-            contig_id = contigs.pop(contig_name)
-        except KeyError:
-            not_found.append(contig_name)
-            return
-        for i, cov in enumerate(_coverages):
-            db.session.add(Coverage(value=cov, sample=samples[i], contig_id=contig_id))
-
-    if not has_header:
         contig_name, *_coverages = fields
-        add_coverages(contig_name, _coverages)
+        coverages[contig_name] = {samples[i]: _coverages[i] for i, _ in enumerate(samples)}
 
     for contig_name, *_coverages in coverage_file:
-        add_coverages(contig_name, _coverages)
+        coverages[contig_name] = {samples[i]: _coverages[i] for i, _ in enumerate(samples)}
 
-    db.session.commit()
-    os.remove(coverage_filename)
-    return not_found
+    os.remove(filename)
+    return samples, coverages
 
-
+    
 def find_essential_genes_per_contig(assembly_path):
     """
     :param assembly_path: Fasta file with the assembly contigs.
@@ -135,15 +126,14 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
     # Save contigs to database
     job.meta['status'] = 'Saving contigs'
     job.save()
-    contigs = save_contigs(assembly, fasta_filename, calculate_fourmers,
-                           essential_genes, bulk_size)
-
-    # Calculate and save coverages to database
+    args = [assembly, fasta_filename, calculate_fourmers, essential_genes, bulk_size]
     if coverage_filename is not None:
-        job.meta['status'] = 'Saving coverage data'
-        job.save()
-        job.meta['notfound'].extend(save_coverages(contigs, coverage_filename))
-        job.save()
+        samples, coverages = read_coverages(coverage_filename)
+        args.append(coverages)
+        assembly.samples = ','.join(samples)
+    notfound = save_contigs(*args)
+    job.meta['notfound'].extend(notfound)
+    job.save()
 
     # Cleanup
     os.remove(fasta_filename)

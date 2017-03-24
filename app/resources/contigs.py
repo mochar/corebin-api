@@ -45,12 +45,19 @@ class ContigsApi(Resource):
     def get(self, assembly_id):
         args = self.reqparse.parse_args()
         contigs = user_assembly_or_404(assembly_id).contigs
-        if args.fields:
-            fields = args.fields.split(',')
-            contigs = contigs.options(db.load_only(*fields))
+
+        # Column loading
+        fields = args.fields.split(',')
+        if args.coverages:
+            fields.append('coverage')
+        contigs = contigs.options(db.load_only(*fields))
+
+        # Sort
         if args.sort:
             order = db.desc(args.sort[1:]) if args.sort[0] == '-' else db.asc(args.sort)
             contigs = contigs.order_by(order)
+        
+        # Filters
         if args.length:
             for value in args.length:
                 filter = filter_contigs(Contig.length, value)
@@ -63,8 +70,8 @@ class ContigsApi(Resource):
             contigs = contigs.options(db.joinedload('bins'))
             bin_ids = args.bins.split(',')
             contigs = contigs.join((Bin, Contig.bins)).filter(Bin.id.in_(bin_ids))
-        if args.coverages:
-            contigs = contigs.options(db.joinedload('coverages'))
+        
+        # Load in pagination
         contig_pagination = contigs.paginate(args.index, args._items, False)
         
         if args.pca and len(contig_pagination.items) > 1:
@@ -75,10 +82,10 @@ class ContigsApi(Resource):
             r = {}
             if args.fields:
                 for field in fields:
-                    r[field] = getattr(contig, field)
+                    if field != 'coverage':
+                        r[field] = getattr(contig, field)
             if args.coverages:
-                for cov in contig.coverages:
-                    r[cov.sample] = cov.value
+                r.update(contig.coverages)
             if args.pca and len(contig_pagination.items) > 1:
                 r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
             if args.colors:
@@ -89,6 +96,7 @@ class ContigsApi(Resource):
         return {
             'contigs': result if args.contigs else [], 
             'indices': contig_pagination.pages,
-            'index': args.index, 'count': contigs.count(), 
+            'index': args.index, 
+            'count': contigs.count(), 
             'items': args._items
         }

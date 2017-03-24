@@ -1,3 +1,4 @@
+import json
 from collections import Counter
 
 from sqlalchemy.orm import Load
@@ -89,18 +90,13 @@ class Contig(db.Model):
     fourmerfreqs = db.Column(db.String)
     assembly_id = db.Column(db.Integer, db.ForeignKey('assembly.id'),
                             nullable=False)
-    coverages = db.relationship('Coverage', backref='contig',
-                                cascade='all, delete')
+    coverage = db.Column(db.String, default='{}')
     essential_genes = db.relationship('EssentialGene', secondary=gencontig, 
                                       lazy='dynamic', backref=db.backref('contigs'))
-
-
-class Coverage(db.Model):
-    __tablename__ = 'coverage'
-    id = db.Column(db.Integer, primary_key=True)
-    contig_id = db.Column(db.Integer, db.ForeignKey('contig.id'), nullable=False)
-    sample = db.Column(db.String(60))
-    value = db.Column(db.Float)
+    
+    @property
+    def coverages(self):
+        return {sample: float(cov) for sample, cov in json.loads(self.coverage).items()}
 
 
 class BinSet(db.Model):
@@ -126,19 +122,15 @@ class Assembly(db.Model, FastaMixin):
     has_fourmerfreqs = db.Column(db.Boolean)
     genes_searched = db.Column(db.Boolean)
     deleted = db.Column(db.Boolean, default=False)
+    samples = db.Column(db.String)
     contigs = db.relationship('Contig', backref='assembly', lazy='dynamic',
                               cascade='all, delete')
     bin_sets = db.relationship('BinSet', backref='assembly', lazy='dynamic',
                                cascade='all, delete')
                                
     @property
-    def samples(self):
-        samples = self.contigs.join(Coverage.contig) \
-            .options(Load(Coverage).load_only('sample')) \
-            .with_entities('sample') \
-            .distinct() \
-            .all()
-        return [sample[0] for sample in samples]
+    def coverage_samples(self):
+        return [] if self.samples is None else self.samples.split(',')
         
     def to_dict(self):
         return {
@@ -148,7 +140,7 @@ class Assembly(db.Model, FastaMixin):
             'hasFourmerfreqs': self.has_fourmerfreqs,
             'genesSearched': self.genes_searched,
             'binSets': self.bin_sets.count(),
-            'samples': self.samples,
+            'samples': self.coverage_samples,
             'submitDate': self.submit_date.isoformat(' ')
         }
 
