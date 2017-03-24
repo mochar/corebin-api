@@ -68,7 +68,6 @@ class ContigsApi(Resource):
         contig_pagination = contigs.paginate(args.index, args._items, False)
         
         if args.pca and len(contig_pagination.items) > 1:
-            app.logger.debug(contig_pagination.items)
             p_components = utils.pca_fourmerfreqs(contig_pagination.items)
             
         result = []
