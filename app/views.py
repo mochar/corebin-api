@@ -27,22 +27,27 @@ def create_demo_job(userid):
     new_assembly.deleted = False
     new_assembly.submit_date = datetime.utcnow()
 
-    contigs = set()
+    #
+    contig_mapper = {}
+    for contig in demo_assembly.contigs.all():
+        contig_id = contig.id
+        essential_genes = contig.essential_genes.all()
+        clear_session_object(contig)
+        contig.essential_genes = essential_genes
+        contig_mapper[contig_id] = contig
+    new_assembly.contigs = list(contig_mapper.values())
 
     # Add bin sets
     for bin_set in demo_assembly.bin_sets.all():
         bins = []
         for bin in bin_set.bins.all():
-            bin_contigs = [clear_session_object(c) for c in bin.contigs.all()]
+            bin_contigs = [contig_mapper[c.id] for c in bin.contigs.all()]
             clear_session_object(bin)
             bin.contigs = bin_contigs
-            contigs.update(bin_contigs)
             bins.append(bin)
         clear_session_object(bin_set)
         bin_set.bins = bins
         new_assembly.bin_sets.append(bin_set)
-
-    new_assembly.contigs = list(contigs)
 
     db.session.add(new_assembly)
     db.session.commit()
