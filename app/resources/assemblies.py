@@ -53,6 +53,10 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
         if i % bulk_size == 0:
             app.logger.debug('At: ' + str(i))
             db.session.flush()
+    db.session.flush()
+    pcs = utils.pca_fourmerfreqs(assembly.contigs)
+    for i, contig in enumerate(assembly.contigs): # TODO: load nothing?
+        contig.pc_1, contig.pc_2, contig.pc_3 = pcs[i]
     db.session.commit()
     return notfound
 

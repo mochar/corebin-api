@@ -87,6 +87,9 @@ class Contig(db.Model):
     name = db.Column(db.String(120))
     length = db.Column(db.Integer)
     gc = db.Column(db.Float)
+    pc_1 = db.Column(db.Float)
+    pc_2 = db.Column(db.Float)
+    pc_3 = db.Column(db.Float)
     fourmerfreqs = db.Column(db.String)
     assembly_id = db.Column(db.Integer, db.ForeignKey('assembly.id'),
                             nullable=False)

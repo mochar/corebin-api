@@ -50,6 +50,8 @@ class ContigsApi(Resource):
         fields = args.fields.split(',')
         if args.coverages:
             fields.append('coverage')
+        if args.pca:
+            fields.extend(['pc_1', 'pc_2', 'pc_3'])
         contigs = contigs.options(db.load_only(*fields))
 
         # Sort
@@ -74,9 +76,6 @@ class ContigsApi(Resource):
         # Load in pagination
         contig_pagination = contigs.paginate(args.index, args._items, False)
         
-        if args.pca and len(contig_pagination.items) > 1:
-            p_components = utils.pca_fourmerfreqs(contig_pagination.items)
-            
         result = []
         for i, contig in enumerate(contig_pagination.items):
             r = {}
@@ -86,8 +85,8 @@ class ContigsApi(Resource):
                         r[field] = getattr(contig, field)
             if args.coverages:
                 r.update(contig.coverages)
-            if args.pca and len(contig_pagination.items) > 1:
-                r['pc_1'], r['pc_2'], r['pc_3'] = p_components[i]
+            if args.pca:
+                r['pc_1'], r['pc_2'], r['pc_3'] = contig.pc_1, contig.pc_2, contig.pc_3
             if args.colors:
                 for bin in contig.bins:
                     r['color_{}'.format(bin.bin_set_id)] = bin.color
