@@ -3,6 +3,7 @@ import os
 import uuid
 import json
 from itertools import product
+from collections import Counter
 from datetime import datetime
 from subprocess import call
 
@@ -45,8 +46,8 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
                 all_genes[gene].contigs.append(contig)
         if calculate_fourmers:
             fourmer_count = len(sequence) - 4 + 1
-            frequencies = ','.join(str(sequence.count(fourmer) / fourmer_count)
-                                   for fourmer in fourmers)
+            counts = Counter([sequence[k:k+4] for k in range(fourmer_count)])
+            frequencies = ','.join([str(counts[fourmer] / fourmer_count) for fourmer in fourmers])
             contig.fourmerfreqs = frequencies
         db.session.add(contig)
         if i % bulk_size == 0:
