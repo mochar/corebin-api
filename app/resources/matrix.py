@@ -13,6 +13,8 @@ class MatrixApi(Resource):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('binset1', type=int, required=True)
         self.reqparse.add_argument('binset2', type=int, required=True)
+        self.reqparse.add_argument('bins1', type=int, action='append', default=[])
+        self.reqparse.add_argument('bins2', type=int, action='append', default=[])
         self.reqparse.add_argument('by', type=str, choices=['bp', 'count'],
                                     default='count')
 
@@ -35,10 +37,19 @@ class MatrixApi(Resource):
                 matrix[i][j] = sum([c.length for c in set(bin1.contigs_eager).intersection(set(bin2.contigs_eager))])
         matrix[lbins1:, :lbins1] = np.swapaxes(matrix[:lbins1, lbins1:], 1, 0)
         return matrix.tolist()
+
+    def _query_bins(self, bin_set, bins, reverse=False):
+        q = bin_set.bins.options(
+            db.Load(Bin).load_only('id', 'gc'),
+            db.Load(Contig).load_only('length')
+        )
+        if len(bins) > 0:
+            q = q.filter(Bin.id.in_(bins))
+        return sorted(q.all(), key=lambda x: x.gc, reverse=reverse)
         
-    def generate_matrix_by_count(self, bin_set1, bin_set2):
-        bins1 = [bin.id for bin in sorted(bin_set1.bins.all(), key=lambda x: x.gc)]
-        bins2 = [bin.id for bin in sorted(bin_set2.bins.all(), key=lambda x: x.gc, reverse=True)]
+    def generate_matrix_by_count(self, bin_set1, bin_set2, bins1, bins2):
+        bins1 = [bin.id for bin in self._query_bins(bin_set1, bins1)]
+        bins2 = [bin.id for bin in self._query_bins(bin_set2, bins2, True)]
         all_bins = bins1 + bins2
 
         data = db.session.query(bincontig). \
@@ -53,21 +64,9 @@ class MatrixApi(Resource):
         matrix = self._create_matrix(bins11, bins22)
         return {'matrix': matrix, 'bins1': bins1, 'bins2': bins2}
         
-    def generate_matrix_by_bp(self, bin_set1, bin_set2):
-        # Get contigs for bin set 1 bins
-        q = bin_set1.bins.options(
-            db.Load(Bin).load_only('id', 'gc'),
-            db.Load(Contig).load_only('length')
-        )
-        bins1 = sorted(q.all(), key=lambda x: x.gc)
-        
-        # Get contigs for bin set 2 bins
-        q = bin_set2.bins.options(
-            db.Load(Bin).load_only('id', 'gc'),
-            db.Load(Contig).load_only('length')
-        )
-        bins2 = sorted(q.all(), key=lambda x: x.gc, reverse=True)
-        
+    def generate_matrix_by_bp(self, bin_set1, bin_set2, bins1, bins2):
+        bins1 = self._query_bins(bin_set1, bins1)
+        bins2 = self._query_bins(bin_set2, bins2, True)
         return {
             'matrix': self._create_matrix_by_bp(bins1, bins2),
             'bins1': [bin.id for bin in bins1], 
@@ -78,6 +77,7 @@ class MatrixApi(Resource):
         args = self.reqparse.parse_args()
         bin_set1 = bin_set_or_404(assembly_id, args.binset1)
         bin_set2 = bin_set_or_404(assembly_id, args.binset2)
+        params = (bin_set1, bin_set2, args.bins1, args.bins2)
         if args.by == 'count':
-            return self.generate_matrix_by_count(bin_set1, bin_set2)
-        return self.generate_matrix_by_bp(bin_set1, bin_set2)
+            return self.generate_matrix_by_count(*params)
+        return self.generate_matrix_by_bp(*params)
