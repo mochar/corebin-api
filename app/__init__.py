@@ -23,7 +23,7 @@ from app.resources.contigs_plot import ContigsPlotApi
 from app.resources.bin_sets import BinSetsApi
 from app.resources.bin_set import BinSetApi
 from app.resources.bins import BinsApi
-from app.resources.bin import BinApi
+from app.resources.bin import BinApi, BinExportApi
 from app.resources.matrix import MatrixApi
 from app.resources.hmmer import HmmerApi
 from app.resources.jobs import JobsApi, JobApi
@@ -39,6 +39,7 @@ api.add_resource(BinSetApi, '/a/<int:assembly_id>/bs/<int:id>')
 api.add_resource(AssessApi, '/a/<int:assembly_id>/bs/<int:id>/assess')
 api.add_resource(BinsApi, '/a/<int:assembly_id>/bs/<int:id>/b')
 api.add_resource(BinApi, '/a/<int:assembly_id>/bs/<int:bin_set_id>/b/<int:id>')
+api.add_resource(BinExportApi, '/a/<int:assembly_id>/bs/<int:bin_set_id>/b/<int:id>/export')
 api.add_resource(MatrixApi, '/a/<int:assembly_id>/matrix')
 api.add_resource(HmmerApi, '/hmmer')
 api.add_resource(JobsApi, '/jobs')

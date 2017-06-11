@@ -1,8 +1,10 @@
-from flask import abort
+import os
+
+from flask import abort, session, make_response
 from flask_restful import Resource, reqparse
 
 from .utils import bin_or_404
-from app import db, utils
+from app import db, utils, app
 from app.models import Bin, Contig
 
 
@@ -89,3 +91,21 @@ class BinApi(Resource):
         unbinned.recalculate_values()
         db.session.delete(bin)
         db.session.commit()
+
+
+class BinExportApi(Resource):
+    def get(self, assembly_id, bin_set_id, id):
+        bin = bin_or_404(assembly_id, bin_set_id, id)
+        q = bin.contigs.options(db.load_only('name'))
+        contig_names = [c.name for c in q.all()]
+        fasta_path = os.path.join(app.config['BASEDIR'], 
+                                  'data/assemblies', 
+                                  '{}.fa'.format(assembly_id))
+        fasta_string = '\n'.join(['\n'.join((name, sequence))
+                                  for name, sequence in utils.parse_fasta(fasta_path) 
+                                  if name in contig_names])
+        response = make_response(fasta_string)
+        response.headers['Content-Disposition'] = 'attachment; filename='
+        response.headers['Content-Disposition'] += '{}.fa'.format(bin.name)
+        return response
+ 
