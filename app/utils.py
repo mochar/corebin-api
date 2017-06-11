@@ -114,3 +114,8 @@ def pca_fourmerfreqs(contigs, num_components=3):
                       for contig in contigs])
     p_components, *_ = pca(data, num_components)
     return p_components
+
+
+def send_completion_email(email, assembly_name):
+    # TODO
+    pass

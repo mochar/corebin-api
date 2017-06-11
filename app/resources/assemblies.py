@@ -8,7 +8,7 @@ from datetime import datetime
 from subprocess import call
 
 import werkzeug
-from flask import session, abort
+from flask import session, abort, request
 from flask_restful import Resource, reqparse
 from rq import get_current_job
 
@@ -34,7 +34,7 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
         sequence = sequence.lower()
         contig = Contig(name=name, length=len(sequence),
                         gc=utils.gc_content(sequence), 
-                        assembly_id=assembly.id)
+                        assembly=assembly)
         if coverages is not None:
             try:
                 coverage = coverages.pop(name)
@@ -53,10 +53,11 @@ def save_contigs(assembly, fasta_filename, calculate_fourmers, essential_genes=N
         if i % bulk_size == 0:
             app.logger.debug('At: ' + str(i))
             db.session.flush()
-    db.session.flush()
-    pcs = utils.pca_fourmerfreqs(assembly.contigs)
-    for i, contig in enumerate(assembly.contigs): # TODO: load nothing?
-        contig.pc_1, contig.pc_2, contig.pc_3 = pcs[i]
+    db.session.commit()
+    if calculate_fourmers:
+        pcs = utils.pca_fourmerfreqs(assembly.contigs)
+        for i, contig in enumerate(assembly.contigs): # TODO: load nothing?
+            contig.pc_1, contig.pc_2, contig.pc_3 = pcs[i]
     db.session.commit()
     return notfound
 
@@ -111,14 +112,9 @@ def find_essential_genes_per_contig(assembly_path):
         return utils.parse_hmmsearch_table(orfs_path)
 
 
-def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
-                      search_genes, coverage_filename=None, 
-                      bulk_size=5000):
-    assembly = Assembly(name=name, userid=userid, submit_date=datetime.utcnow(),
-                        has_fourmerfreqs=calculate_fourmers,
-                        genes_searched=search_genes)
-    db.session.add(assembly)
-    db.session.flush()
+def save_assembly_job(assembly, fasta_path, calculate_fourmers,
+                      search_genes, email=None, 
+                      coverage_filename=None, bulk_size=5000):
     job = get_current_job()
 
     # Find essential genes
@@ -126,12 +122,12 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
     if search_genes:
         job.meta['status'] = 'Searching for essential genes per contig'
         job.save()
-        essential_genes = find_essential_genes_per_contig(fasta_filename)
+        essential_genes = find_essential_genes_per_contig(fasta_path)
 
     # Save contigs to database
     job.meta['status'] = 'Saving contigs'
     job.save()
-    args = [assembly, fasta_filename, calculate_fourmers, essential_genes, bulk_size]
+    args = [assembly, fasta_path, calculate_fourmers, essential_genes, bulk_size]
     if coverage_filename is not None:
         samples, coverages = read_coverages(coverage_filename)
         args.append(coverages)
@@ -140,8 +136,13 @@ def save_assembly_job(name, userid, fasta_filename, calculate_fourmers,
     job.meta['notfound'].extend(notfound)
     job.save()
 
-    # Cleanup
-    os.remove(fasta_filename)
+    assembly.busy = False
+    db.session.add(assembly)
+    db.session.commit()
+
+    if email:
+        utils.send_completion_email(email, assembly.name)
+
     return {'assembly': assembly.id}
     
 
@@ -150,6 +151,7 @@ class AssembliesApi(Resource):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('name', type=str, default='assembly',
                                    location='form')
+        self.reqparse.add_argument('email', type=str, location='form')
         self.reqparse.add_argument('fourmers', type=bool, default=False,
                                    location='form')
         self.reqparse.add_argument('hmmer', type=bool, default=False,
@@ -164,8 +166,9 @@ class AssembliesApi(Resource):
         userid = session.get('userid')
         if userid is None:
             return {'assemblies': []}
-        result = [a.to_dict() for a in Assembly.query.filter_by(userid=userid, deleted=False).all()]
-        return {'assemblies': result}
+        assemblies = Assembly.query.filter_by(userid=userid, deleted=False, busy=False).all()
+        assemblies = [a.to_dict() for a in assemblies]
+        return {'assemblies': assemblies}
 
     def post(self):
         args = self.reqparse.parse_args()
@@ -184,11 +187,24 @@ class AssembliesApi(Resource):
         if args.contigs.filename == '':
             return {'message': 'Please provide an assembly file.'}, 403, {}
 
+        # Create assembly
         name = args.name or 'Assembly'
+        assembly = Assembly(name=name, 
+                            ip=request.headers.get('X-Forwarded-For', request.remote_addr),
+                            userid=session['userid'], 
+                            email=args.email,
+                            busy=True,
+                            submit_date=datetime.utcnow(),
+                            has_fourmerfreqs=args.fourmers,
+                            genes_searched=args.hmmer)
+        db.session.add(assembly)
+        db.session.commit()
 
-        fasta_file = tempfile.NamedTemporaryFile(delete=False)
-        args.contigs.save(fasta_file)
-        fasta_file.close()
+        fasta_path = os.path.join(app.config['BASEDIR'], 
+                                  'data/assemblies', 
+                                  '{}.fa'.format(assembly.id))
+        with open(fasta_path, 'wb') as f:
+            args.contigs.save(f)
 
         if args.coverage.filename != '':
             coverage_file = tempfile.NamedTemporaryFile(delete=False)
@@ -196,7 +212,7 @@ class AssembliesApi(Resource):
             coverage_file.close()
             
         # Send job
-        job_args = [name, session['userid'], fasta_file.name, args.fourmers, args.hmmer]
+        job_args = [assembly, fasta_path, args.fourmers, args.hmmer, args.email]
         job_meta = {'name': name, 'status': 'pending', 'type': 'A', 'notfound': []}
         if args.coverage.filename != '':
             job_args.append(coverage_file.name)

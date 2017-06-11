@@ -49,6 +49,7 @@ class JobApi(Resource):
         return job.meta
 
     def delete(self, job_id):
-        session['jobs'].remove(job_id)
+        if job_id in session['jobs']:
+            session['jobs'].remove(job_id)
         q.fetch_job(job_id).cancel()
         return {}
