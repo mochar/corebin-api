@@ -67,11 +67,7 @@ class BinSetsApi(Resource):
 
     def get(self, assembly_id):
         assembly = user_assembly_or_404(assembly_id)
-        result = []
-        for bin_set in assembly.bin_sets:
-            result.append({
-                'name': bin_set.name, 'id': bin_set.id, 'assembly': assembly.id,
-                'color': bin_set.color, 'bins': [bin.id for bin in bin_set.bins]})
+        result = [bin_set.to_dict() for bin_set in assembly.bin_sets.all()]
         return {'binSets': result}
 
     def post(self, assembly_id):

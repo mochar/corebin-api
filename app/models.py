@@ -114,6 +114,15 @@ class BinSet(db.Model):
     @property
     def without_unbinned(self):
         return self.bins.filter(Bin.name != 'unbinned')
+        
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'assembly': self.assembly_id,
+            'color': self.color,
+            'bins': [bin.id for bin in self.bins.options(db.load_only('id'))]
+        }
 
 
 class Assembly(db.Model, FastaMixin):
