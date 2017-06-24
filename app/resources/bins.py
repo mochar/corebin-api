@@ -9,7 +9,7 @@ from app.models import Bin
 class BinsApi(Resource):
     def __init__(self):
         self.reqparse = reqparse.RequestParser()
-        self.reqparse.add_argument('ids', type=str)
+        self.reqparse.add_argument('ids', type=int, action='append')
         self.reqparse.add_argument('name', type=str)
         self.reqparse.add_argument('color', type=str)
         self.reqparse.add_argument('contigs', type=bool)
@@ -32,8 +32,18 @@ class BinsApi(Resource):
         args = self.reqparse.parse_args()
         if args.ids is None:
             abort(400)
-        ids = [int(id) for id in args.ids.split(',')]
-        bin_set.bins.filter(Bin.id.in_(ids)).delete(synchronize_session='fetch')
+        bins = bin_set.bins.filter(Bin.id.in_(args.ids)). \
+                            filter(Bin.name != 'unbinned'). \
+                            all()
+        unbinned = bin_set.bins.filter_by(name='unbinned').first_or_404()
+        for bin in bins:
+            contigs = bin.contigs.all()
+            bin.contigs = []
+            unbinned.contigs.extend(contigs)
+        db.session.flush()
+        for bin in bins:
+            db.session.delete(bin)
+        unbinned.recalculate_values()
         db.session.commit()
 
     def post(self, assembly_id, id):
