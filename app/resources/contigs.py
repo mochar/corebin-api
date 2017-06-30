@@ -37,7 +37,7 @@ class ContigsApi(Resource):
         self.reqparse.add_argument('gc', type=str, action='append', default=[])
         self.reqparse.add_argument('bins', type=str)
         self.reqparse.add_argument('coverages', type=inputs.boolean)
-        self.reqparse.add_argument('colors', type=inputs.boolean)
+        self.reqparse.add_argument('colors', type=inputs.boolean, default=True)
         self.reqparse.add_argument('contigs', type=inputs.boolean, default=True)
         self.reqparse.add_argument('pca', type=inputs.boolean, default=False)
         super(ContigsApi, self).__init__()
@@ -90,6 +90,8 @@ class ContigsApi(Resource):
             if args.colors:
                 for bin in contig.bins:
                     r['color_{}'.format(bin.bin_set_id)] = bin.color
+            if args.bins:
+                r['bin'] = [b.id for b in contig.bins if str(b.id) in bin_ids][0]
             result.append(r)
 
         return {
