@@ -95,7 +95,9 @@ class BinApi(Resource):
 
 class BinExportApi(Resource):
     def get(self, assembly_id, bin_set_id, id):
-        bin = bin_or_404(assembly_id, bin_set_id, id)
+        bin_set, bin = bin_or_404(assembly_id, bin_set_id, id, return_bin_set=True)
+        if bin_set.assembly.demo:
+            assembly_id = 1
         q = bin.contigs.options(db.load_only('name'))
         contig_names = [c.name for c in q.all()]
         fasta_path = os.path.join(app.config['BASEDIR'], 

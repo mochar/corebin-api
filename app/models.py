@@ -139,6 +139,7 @@ class Assembly(db.Model, FastaMixin):
     genes_searched = db.Column(db.Boolean)
     deleted = db.Column(db.Boolean, default=False)
     busy = db.Column(db.Boolean, default=False)
+    demo = db.Column(db.Boolean, default=False)
     samples = db.Column(db.String)
     contigs = db.relationship('Contig', backref='assembly', lazy='dynamic',
                               cascade='all, delete')

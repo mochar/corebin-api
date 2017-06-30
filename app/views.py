@@ -25,6 +25,7 @@ def create_demo_job(userid):
     # Modify new assembly object
     new_assembly.userid = userid
     new_assembly.deleted = False
+    new_assembly.demo = True
     new_assembly.submit_date = datetime.utcnow()
 
     #
