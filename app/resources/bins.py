@@ -33,9 +33,9 @@ class BinsApi(Resource):
         if args.ids is None:
             abort(400)
         bins = bin_set.bins.filter(Bin.id.in_(args.ids)). \
-                            filter(Bin.name != 'unbinned'). \
+                            filter_by(unbinned=False). \
                             all()
-        unbinned = bin_set.bins.filter_by(name='unbinned').first_or_404()
+        unbinned = bin_set.bins.filter_by(unbinned=True).first_or_404()
         for bin in bins:
             contigs = bin.contigs.all()
             bin.contigs = []
@@ -51,7 +51,7 @@ class BinsApi(Resource):
         bin_set = bin_set_or_404(assembly_id, id)
         randcol = randomcolor.RandomColor()
         if args.name:
-            color = args.color or randcol.generate()[0]
+            color = args.color or randcol.generate(luminosity='dark')[0]
             bin = Bin(name=args.name, bin_set=bin_set, color=color)
             bin.recalculate_values()
             db.session.add(bin)

@@ -65,7 +65,7 @@ class BinApi(Resource):
                 bin.contigs = contigs
             bin.recalculate_values()
         if args.name is not None or args.color is not None:
-            if bin.name == 'unbinned':
+            if bin.unbinned:
                 return {}, 405
             bin.name = args.name or bin.name
             bin.color = args.color or bin.color
@@ -81,9 +81,9 @@ class BinApi(Resource):
     def delete(self, assembly_id, bin_set_id, id):
         args = self.reqparse.parse_args()
         bin_set, bin = bin_or_404(assembly_id, bin_set_id, id, return_bin_set=True)
-        if bin.name == 'unbinned':
+        if bin.unbinned:
             return {}, 405
-        unbinned = bin_set.bins.filter_by(name='unbinned').first_or_404()
+        unbinned = bin_set.bins.filter_by(unbinned=True).first_or_404()
         contigs = bin.contigs.all()
         bin.contigs = []
         unbinned.contigs.extend(contigs)

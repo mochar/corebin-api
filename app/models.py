@@ -35,6 +35,7 @@ class Bin(db.Model, FastaMixin):
     n50 = db.Column(db.Integer)
     contamination = db.Column(db.Float)
     completeness = db.Column(db.Float)
+    unbinned = db.Column(db.Boolean, default=False)
 
     # contigs = db.relationship('Contig', secondary=bincontig, lazy='dynamic',
     #                           backref=db.backref('bins'), viewonly=True)
@@ -77,7 +78,8 @@ class Bin(db.Model, FastaMixin):
             'size': self.size,
             'mbp': self.bp / 1000000,
             'contamination': self.contamination,
-            'completeness': self.completeness
+            'completeness': self.completeness,
+            'unbinned': self.unbinned
         }
 
 
@@ -113,7 +115,7 @@ class BinSet(db.Model):
                             nullable=False)
     @property
     def without_unbinned(self):
-        return self.bins.filter(Bin.name != 'unbinned')
+        return self.bins.filter_by(unbinned=False)
         
     def to_dict(self):
         return {

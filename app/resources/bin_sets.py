@@ -12,7 +12,7 @@ from app import db, utils, randcol, app, q
 from app.models import Contig, Bin, BinSet, Assembly
 
 
-def save_bin_set_job(name, assembly_id, filename):
+def save_bin_set_job(name, assembly_id, filename=None):
     assembly = Assembly.query.get(assembly_id)
     bin_set = BinSet(name=name, color=randcol.generate(luminosity='dark')[0],
                      assembly=assembly)
@@ -23,27 +23,28 @@ def save_bin_set_job(name, assembly_id, filename):
     query = assembly.contigs.options(load_only('name'))
     contigs = {c.name: c for c in query.all()}
 
-    # Dict: bin -> contigs
-    bins = defaultdict(list)
     notfound = []
-    for contig_name, bin_name in utils.parse_dsv(filename):
-        if contig_name in contigs:
-            bins[bin_name].append(contig_name)
-        else:
-            notfound.append(contig_name)
+    if filename:
+        # Dict: bin -> contigs
+        bins = defaultdict(list)
+        for contig_name, bin_name in utils.parse_dsv(filename):
+            if contig_name in contigs:
+                bins[bin_name].append(contig_name)
+            else:
+                notfound.append(contig_name)
 
-    for bin_name, bin_contigs in bins.items():
-        notfound.extend([c for c in bin_contigs if c not in contigs])
-        bin_contigs = [contigs.pop(c) for c in bin_contigs]
-        Bin(name=bin_name, color=randcol.generate(luminosity='dark')[0],
-            bin_set_id=bin_set.id, contigs=bin_contigs)
+        for bin_name, bin_contigs in bins.items():
+            notfound.extend([c for c in bin_contigs if c not in contigs])
+            bin_contigs = [contigs.pop(c) for c in bin_contigs]
+            Bin(name=bin_name, color=randcol.generate(luminosity='dark')[0],
+                bin_set_id=bin_set.id, contigs=bin_contigs)
+        os.remove(filename)
     
     # Create a bin for the unbinned contigs.
     bin = Bin(name='unbinned', color='#939393', bin_set_id=bin_set.id,
-              contigs=list(contigs.values()))
+              contigs=list(contigs.values()), unbinned=True)
     db.session.add(bin)
 
-    os.remove(filename)
     db.session.flush()
     for bin in bin_set.bins:
         bin.recalculate_values()
@@ -74,17 +75,17 @@ class BinSetsApi(Resource):
         assembly = user_assembly_or_404(assembly_id)
         args = self.reqparse.parse_args()
 
-        if args.bins.filename == '':
-            return {}, 403, {}
-
-        bin_file = tempfile.NamedTemporaryFile(delete=False)
-        args.bins.save(bin_file)
-        bin_file.close()
-
         name = args.name or 'Binset'
+
+        if args.bins.filename != '':
+            bin_file = tempfile.NamedTemporaryFile(delete=False)
+            args.bins.save(bin_file)
+            bin_file.close()
         
         # Send job
-        job_args = [name, assembly.id, bin_file.name]
+        job_args = [name, assembly.id]
+        if args.bins.filename != '':
+            job_args.append(bin_file.name)
         job_meta = {'type': 'B', 'name': name, 'assembly': assembly.id}
         job = q.enqueue(save_bin_set_job, args=job_args, meta=job_meta)
         session['jobs'].append(job.id)
