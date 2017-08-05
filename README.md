@@ -1,2 +1,6 @@
-### Files in data folder
-essential.hmm (https://github.com/MadsAlbertsen/mmgenome/blob/master/scripts/essential.hmm)
+#### Installation 
+`$ git clone https://github.com/mochar/corebin-api.git`    
+`$ python3 manage.py setup`
+
+#### Run
+`$ python3 manage.py runserver`
