@@ -1,6 +1,7 @@
 import os
 import subprocess
-import pickle
+import shutil
+import urllib.request
 from collections import defaultdict
 
 from flask_script import Manager
@@ -13,14 +14,19 @@ from scripts import export_data
 manager = Manager(app)
 
 
-@manager.command
-def createdb():
+def setup_database():
+    db.drop_all()
     db.create_all()
     for line in open('data/essential.hmm', 'r'):
         if line.startswith('NAME'):
             gene = line.rstrip().split(' ')[-1]
             db.session.add(EssentialGene(name=gene, source='essential'))
     db.session.commit()
+
+
+@manager.command
+def createdb():
+    setup_database()
 
 
 @manager.command
@@ -34,18 +40,11 @@ def contigs_count():
     
 @manager.command
 def setup():
-    db.create_all()
-    if not os.path.exists('data'):
-        os.mkdir('data')
-    o = subprocess.check_output(['checkm', 'taxon_list'], 
-        universal_newlines=True)
-    rank_taxon = defaultdict(list)
-    for line in o.split('\n')[4:-2]:
-        rank, taxon, *_ = line.strip().split()
-        rank_taxon[rank].append(taxon)
-    with open('data/taxon_list.pkl', 'wb') as f:
-        pickle.dump(rank_taxon, f, pickle.HIGHEST_PROTOCOL)
-
+    setup_database()
+    shutil.rmtree('data')
+    os.mkdir('data')
+    urllib.request.urlretrieve('https://raw.githubusercontent.com/MadsAlbertsen/mmgenome/master/scripts/essential.hmm', 'data/essential.hmm')
+    os.mkdir('data/assemblies')
 
 @manager.option('-t', '--type', dest='type_')
 @manager.option('-i', '--id', dest='id_')
