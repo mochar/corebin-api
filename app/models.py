@@ -119,6 +119,7 @@ class BinSet(db.Model):
         
     def to_dict(self):
         bins = self.bins.options(db.load_only('id', 'color'))
+        bins = sorted(bins, key=lambda x: x.size, reverse=True)
         sum_ = sum([b.size for b in bins])
         return {
             'id': self.id,
