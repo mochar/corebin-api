@@ -118,12 +118,15 @@ class BinSet(db.Model):
         return self.bins.filter_by(unbinned=False)
         
     def to_dict(self):
+        bins = self.bins.options(db.load_only('id', 'color'))
+        sum_ = sum([b.size for b in bins])
         return {
             'id': self.id,
             'name': self.name,
             'assembly': self.assembly_id,
             'color': self.color,
-            'bins': [bin.id for bin in self.bins.options(db.load_only('id'))]
+            'bins': [bin.id for bin in bins],
+            'colors': [{'color': b.color, 'percentage': b.size / sum_} for b in bins]
         }
 
 
