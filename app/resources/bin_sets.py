@@ -1,6 +1,7 @@
 import tempfile
 import os
 from collections import defaultdict
+from datetime import datetime
 
 import werkzeug
 from flask import session
@@ -14,7 +15,9 @@ from app.models import Contig, Bin, BinSet, Assembly
 
 def save_bin_set_job(name, assembly_id, filename=None):
     assembly = Assembly.query.get(assembly_id)
-    bin_set = BinSet(name=name, color=randcol.generate(luminosity='dark')[0],
+    bin_set = BinSet(name=name, 
+                     color=randcol.generate(luminosity='dark')[0],
+                     submit_date=datetime.utcnow(),
                      assembly=assembly)
     db.session.add(bin_set)
     db.session.flush()

@@ -109,6 +109,7 @@ class BinSet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50))
     color = db.Column(db.String(7))
+    submit_date = db.Column(db.DateTime)
     bins = db.relationship('Bin', backref='bin_set', lazy='dynamic',
                            cascade='all, delete')
     assembly_id = db.Column(db.Integer, db.ForeignKey('assembly.id'),
@@ -126,6 +127,7 @@ class BinSet(db.Model):
             'name': self.name,
             'assembly': self.assembly_id,
             'color': self.color,
+            'submitDate': self.submit_date.isoformat(' '),
             'bins': [bin.id for bin in bins],
             'colors': [{'color': b.color, 'percentage': b.size / sum_} for b in bins]
         }

@@ -20,11 +20,7 @@ class BinSetApi(Resource):
 
     def get(self, assembly_id, id):
         bin_set = bin_set_or_404(assembly_id, id)
-        return {
-            'id': bin_set.id, 'name': bin_set.name, 'color': bin_set.color,
-            'bins': [bin.id for bin in bin_set.bins],
-            'assembly': bin_set.assembly.id
-        }
+        return bin_set.to_dict()
 
     def put(self, assembly_id, id):
         args = self.reqparse.parse_args()
